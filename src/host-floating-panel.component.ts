@@ -106,16 +106,14 @@ import { HostI18nService } from './host-i18n.service'
                 <div class="hp-host-body">
                   <span class="hp-host-name">{{ host.name }}</span>
                   <div class="hp-host-details">
-                    <span class="hp-host-detail hp-host-addr" *ngIf="host.host" [title]="i18n.t('host.host')">{{ host.host }}</span>
-                    <span class="hp-host-detail hp-host-port" *ngIf="host.port && host.port !== 22" [title]="i18n.t('host.port')">:{{ host.port }}</span>
+                    <span class="hp-host-detail hp-host-addr" *ngIf="host.host" [title]="i18n.t('host.host')">{{ host.host }}<span class="hp-host-port">:{{ host.port || 22 }}</span></span>
                     <span class="hp-host-detail hp-host-user" *ngIf="host.username" [title]="i18n.t('host.username')">{{ host.username }}</span>
                   </div>
                   <span class="hp-host-remark" *ngIf="host.remark" [title]="host.remark">{{ host.remark }}</span>
                 </div>
                 <div class="hp-host-actions">
-                  <span class="hp-host-act" (click)="togglePin(host); $event.stopPropagation()"
-                    [title]="host.pinned ? i18n.t('panel.unpin') : i18n.t('panel.pin')"
-                    [class.active]="host.pinned">&#x2691;</span>
+                  <span class="hp-host-act hp-host-act-copy" (click)="copyHost(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_host')">&#x2398;</span>
+                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x1F512;</span>
                   <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x23CE;</span>
                   <span class="hp-host-act" (click)="editHost(host); $event.stopPropagation()" [title]="i18n.t('panel.edit')">&#x270E;</span>
                   <span class="hp-host-act hp-host-act-del" (click)="deleteHost(host); $event.stopPropagation()" [title]="i18n.t('panel.delete')">&#x2715;</span>
@@ -197,7 +195,10 @@ import { HostI18nService } from './host-i18n.service'
         </div>
         <div class="hp-field">
           <label class="hp-field-label">{{ t('密码', 'Password') }}</label>
-          <input class="hp-field-input" type="password" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" placeholder="SSH 登录密码（不会在主面板显示）">
+          <div class="hp-password-wrap">
+            <input class="hp-field-input hp-password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" placeholder="SSH 登录密码（不会在主面板显示）">
+            <span class="hp-password-eye" (click)="showPassword = !showPassword; $event.stopPropagation()" [title]="showPassword ? t('隐藏密码', 'Hide') : t('显示密码', 'Show')">{{ showPassword ? '&#x1F441;' : '&#x1F576;' }}</span>
+          </div>
         </div>
         <div class="hp-field">
           <label class="hp-field-label">{{ i18n.t('host.remark') }}</label>
@@ -616,15 +617,15 @@ import { HostI18nService } from './host-i18n.service'
     .hp-host-addr {
       font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
     }
+    .hp-host-addr .hp-host-port {
+      color: var(--_text-muted);
+      opacity: 0.7;
+    }
     .hp-host-user {
       color: var(--_primary);
       font-weight: 500;
     }
     .hp-host-user::before { content: '@'; margin-right: 1px; opacity: 0.6; }
-    .hp-host-port {
-      color: var(--_text-muted);
-      font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
-    }
     .hp-host-remark {
       display: block; font-size: 0.72em;
       color: var(--_text-muted);
@@ -649,6 +650,7 @@ import { HostI18nService } from './host-i18n.service'
     .hp-host-act:hover { background: var(--_hover); color: var(--_text); }
     .hp-host-act.active { color: var(--_primary); opacity: 1 !important; }
     .hp-host-act-connect:hover { background: rgba(var(--_primary-rgb), 0.14); color: var(--_primary); }
+    .hp-host-act-copy:hover { background: rgba(var(--_primary-rgb), 0.10); color: var(--_primary); }
     .hp-host-act-del:hover { background: rgba(243,139,168,0.15); color: var(--_danger); }
     .hp-drop-end {
       height: 0; transition: height 0.12s;
@@ -787,6 +789,24 @@ import { HostI18nService } from './host-i18n.service'
       padding-right: 30px;
     }
     select.hp-field-input option { color: #000; background: #fff; }
+
+    /* 密码输入框 + 眼睛切换 */
+    .hp-password-wrap {
+      position: relative; display: flex; align-items: center;
+    }
+    .hp-password-input {
+      padding-right: 40px;
+    }
+    .hp-password-eye {
+      position: absolute; right: 8px;
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+      cursor: pointer; font-size: 1.1em; user-select: none;
+      color: var(--_text-muted);
+      transition: all 0.12s;
+    }
+    .hp-password-eye:hover { background: var(--_hover); color: var(--_text); }
 
     /* 复选框行 */
     .hp-check-row { display: flex; gap: 18px; margin: 12px 0; }
@@ -1148,6 +1168,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
 
   showEditModal = false
   editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '' }
+  showPassword = false
 
   showGroupRename = false
   groupRenameIsNew = false
@@ -1170,10 +1191,15 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     this.showEditModal = true
   }
 
-  togglePin(host: HostEntry): void {
-    this.svc.update(host.id, { pinned: !host.pinned })
-    host.pinned = !host.pinned
-    this.loadData()
+  copyHost(host: HostEntry): void {
+    const addr = host.port && host.port !== 22
+      ? `${host.host}:${host.port}`
+      : host.host
+    try { navigator.clipboard?.writeText(addr) } catch {}
+  }
+
+  copyPassword(host: HostEntry): void {
+    try { navigator.clipboard?.writeText(host.password || '') } catch {}
   }
 
   onResetUsage(): void {
@@ -1201,7 +1227,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     this.showEditModal = false; this.searchText = ''; this.loadData()
   }
 
-  closeEditModal(): void { this.showEditModal = false; this.showEditGroupDropdown = false }
+  closeEditModal(): void { this.showEditModal = false; this.showEditGroupDropdown = false; this.showPassword = false }
 
   private dragHostId: string | null = null
   listDropOver = false

@@ -29,6 +29,8 @@ const translations: Record<string, Record<string, string>> = {
     'panel.ssh_connect': 'SSH 连接',
     'panel.send_to_line': '发送 SSH 命令',
     'panel.copy': '复制地址',
+    'panel.copy_host': '复制主机地址',
+    'panel.copy_password': '复制密码',
 
     'panel.drag_reorder': '拖拽排序',
     'panel.drag_reorder_group': '拖拽排序分组',
@@ -116,6 +118,8 @@ const translations: Record<string, Record<string, string>> = {
     'panel.ssh_connect': 'SSH Connect',
     'panel.send_to_line': 'Send SSH command',
     'panel.copy': 'Copy address',
+    'panel.copy_host': 'Copy host address',
+    'panel.copy_password': 'Copy password',
 
     'panel.drag_reorder': 'Drag to reorder',
     'panel.drag_reorder_group': 'Drag to reorder group',
