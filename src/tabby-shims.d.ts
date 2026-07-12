@@ -10,6 +10,17 @@ declare module 'tabby-core' {
     openNewTab(options: any): any
     closeTab(tab: any): void
   }
+  export interface ToolbarButton {
+    icon?: string
+    title: string
+    weight?: number
+    click?: () => void
+    showInStartPage?: boolean
+    showInToolbar?: boolean
+  }
+  export abstract class ToolbarButtonProvider {
+    abstract provide(): ToolbarButton[]
+  }
   export class ProfilesService {
     openNewTabForProfile(profile: any): Promise<any>
     newTabParametersForProfile(profile: any): Promise<any>

@@ -4,7 +4,7 @@
  */
 import { CommonModule } from '@angular/common'
 import { FormsModule } from '@angular/forms'
-import { NgModule } from '@angular/core'
+import { NgModule, Injectable, Injector } from '@angular/core'
 import TabbyCoreModule from 'tabby-core'
 import { SettingsTabProvider } from 'tabby-settings'
 import { TerminalDecorator } from 'tabby-terminal'
@@ -12,6 +12,7 @@ import { TerminalDecorator } from 'tabby-terminal'
 import { HostTerminalDecorator } from './host-terminal-decorator'
 import { HostFloatingPanel } from './host-floating-panel.component'
 import { HostSettingsTabProvider, HostSettingsComponent } from './host-settings.component'
+import { ToolbarButtonProvider, ToolbarButton } from 'tabby-core'
 
 /** 启动时应用已保存的颜色主题（Host+ 独立 --hp-* 变量体系，不与 QuickCmd+ 共用） */
 function applySavedTheme(): void {
@@ -64,6 +65,25 @@ function applySavedTheme(): void {
 }
 applySavedTheme()
 
+/** 在 Tabby 首页显示 Host+ 入口按钮，点击直接弹出独立面板 */
+@Injectable()
+export class HostStartPageButtonProvider extends ToolbarButtonProvider {
+  constructor(private injector: Injector) {
+    super()
+  }
+
+  provide(): ToolbarButton[] {
+    return [{
+      title: 'Host+',
+      weight: 9,
+      showInStartPage: true,
+      click: () => {
+        HostTerminalDecorator.openStandalonePanel(this.injector)
+      },
+    }]
+  }
+}
+
 @NgModule({
   imports: [
     CommonModule,
@@ -77,6 +97,7 @@ applySavedTheme()
   providers: [
     { provide: TerminalDecorator, useClass: HostTerminalDecorator, multi: true },
     { provide: SettingsTabProvider, useClass: HostSettingsTabProvider, multi: true },
+    { provide: ToolbarButtonProvider, useClass: HostStartPageButtonProvider, multi: true },
   ],
 })
 export default class HostPlusModule {

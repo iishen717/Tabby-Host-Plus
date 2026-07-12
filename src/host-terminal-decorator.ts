@@ -73,6 +73,17 @@ export class HostTerminalDecorator extends TerminalDecorator {
         this.listenEntryModeChange(hostEl)
 
         console.log('[Host+] Entry button injected')
+
+        // 从首页按钮触发的自动打开面板
+        if (sessionStorage.getItem('hp-auto-open') === '1') {
+          sessionStorage.removeItem('hp-auto-open')
+          // 等待工具栏按钮完全渲染后自动点击
+          setTimeout(() => {
+            const entry = hostEl.querySelector('[data-hp-entry="1"]') as HTMLElement | null
+            if (entry) entry.click()
+          }, 600)
+        }
+
         return true
       } catch (err) {
         console.warn('[Host+] tryInsert error', err)
@@ -544,6 +555,105 @@ export class HostTerminalDecorator extends TerminalDecorator {
         this.positionPanelNearEntry(hostEl, cmpRef.instance)
       }
     }
+  }
+
+  /** 静态方法：在无终端的情况下独立弹出主机管理面板（用于首页按钮） */
+  static openStandalonePanel(injector: Injector): void {
+    // 防止重复弹出
+    if (document.querySelector('[data-hp-standalone]')) return
+
+    const resolver = injector.get(ComponentFactoryResolver)
+    const appRef = injector.get(ApplicationRef)
+    const zone = injector.get(NgZone)
+
+    zone.run(() => {
+      try {
+        // 半透明遮罩
+        const backdrop = document.createElement('div')
+        backdrop.setAttribute('data-hp-standalone', 'backdrop')
+        backdrop.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.35);'
+        backdrop.addEventListener('click', () => {
+          HostTerminalDecorator.closeStandalonePanel()
+        })
+        document.body.appendChild(backdrop)
+
+        // 面板容器
+        const panelHost = document.createElement('div')
+        panelHost.setAttribute('data-hp-standalone', 'panel')
+        panelHost.style.cssText = 'position:fixed;z-index:99999;'
+        document.body.appendChild(panelHost)
+
+        const factory = resolver.resolveComponentFactory(HostFloatingPanel)
+        const cmpRef = factory.create(injector, [], panelHost)
+        const cmp = cmpRef.instance
+
+        // 面板居中
+        const pw = cmp.panelWidth || 380
+        cmp.panelX = Math.round((window.innerWidth - pw) / 2)
+        cmp.panelY = Math.round((window.innerHeight - 420) / 2)
+        cmp.terminalRef = null
+        cmp.profileId = ''
+
+        // SSH 连接回调
+        cmp.openSSHTab = (sshHost: string, port: number, user: string, password: string): boolean => {
+          const partialProfile = {
+            type: 'ssh',
+            name: sshHost,
+            options: {
+              host: sshHost,
+              port: port,
+              user: user,
+              auth: password ? 'password' : null,
+              password: password || undefined,
+            },
+          }
+          try {
+            const ps = injector.get(ProfilesService)
+            if (ps?.openNewTabForProfile) {
+              ps.openNewTabForProfile(partialProfile)
+              return true
+            }
+          } catch {}
+          try {
+            const ps = injector.get(ProfilesService)
+            if (ps?.quickConnect) {
+              const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`
+              ps.quickConnect(query)
+              return true
+            }
+          } catch {}
+          return false
+        }
+
+        cmp.onClose = () => {
+          HostTerminalDecorator.closeStandalonePanel()
+        }
+
+        appRef.attachView(cmpRef.hostView)
+        cmpRef.changeDetectorRef.detectChanges()
+
+        // 阻止面板内鼠标事件冒泡到遮罩
+        panelHost.addEventListener('mousedown', (ev: MouseEvent) => ev.stopPropagation())
+        panelHost.addEventListener('click', (ev: MouseEvent) => ev.stopPropagation())
+
+        console.log('[Host+] Standalone panel opened')
+      } catch (e) {
+        console.error('[Host+] Standalone panel error', e)
+      }
+    })
+  }
+
+  /** 关闭独立面板 */
+  static closeStandalonePanel(): void {
+    try {
+      const backdrops = document.querySelectorAll('[data-hp-standalone="backdrop"]')
+      backdrops.forEach(b => b.remove())
+      const panels = document.querySelectorAll('[data-hp-standalone="panel"]')
+      panels.forEach(p => {
+        // 销毁 Angular 组件（如果有的话）
+        p.remove()
+      })
+    } catch {}
   }
 }
 
