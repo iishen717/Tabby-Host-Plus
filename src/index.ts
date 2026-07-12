@@ -74,8 +74,9 @@ export class HostStartPageButtonProvider extends ToolbarButtonProvider {
 
   provide(): ToolbarButton[] {
     return [{
-      title: 'Host+',
-      weight: 9,
+      icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 1h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1m0 8h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1M5 3h2v2H5V3m0 8h2v2H5v-2m0 8h2v2H5v-2m12-5h-2v2h2v-2m0 8h-2v2h2v-2m0-16h-2v2h2V3z"/></svg>',
+      title: 'Host-Plus',
+      weight: 8,
       showInStartPage: true,
       click: () => {
         HostTerminalDecorator.openStandalonePanel(this.injector)
