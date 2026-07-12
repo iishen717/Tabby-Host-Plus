@@ -7,6 +7,7 @@ import { TerminalDecorator } from 'tabby-terminal'
 import { HostFloatingPanel } from './host-floating-panel.component'
 import { HostDataService } from './host-data.service'
 import { HostI18nService } from './host-i18n.service'
+import { AppService, ProfilesService } from 'tabby-core'
 
 @Injectable()
 export class HostTerminalDecorator extends TerminalDecorator {
@@ -173,7 +174,7 @@ export class HostTerminalDecorator extends TerminalDecorator {
       opacity: 0.85;
     `
     entry.title = i18n.t('entry.title')
-    entry.innerHTML = '&#x1F5A5;&nbsp;Host+ <span style="color:var(--qc-text-muted,#6c7086);font-size:calc(var(--qc-font-size,14px) - 1px);">&#x22EE;&#x22EE;</span>'
+    entry.innerHTML = '@&nbsp;Host+ <span style="color:var(--qc-text-muted,#6c7086);font-size:calc(var(--qc-font-size,14px) - 1px);">&#x22EE;&#x22EE;</span>'
 
     const mem = profileId ? hpSvc.getPositionMemory(profileId) : null
     if (mem) {
@@ -209,7 +210,7 @@ export class HostTerminalDecorator extends TerminalDecorator {
     btn.type = 'button'
     btn.className = 'btn btn-sm btn-link me-2'
     btn.setAttribute('data-hp-entry', '1')
-    btn.innerHTML = '&#x1F5A5;&nbsp;Host+'
+    btn.innerHTML = '@&nbsp;Host+'
     btn.title = i18n.t('entry.title')
     btn.style.pointerEvents = 'auto'
 
@@ -386,6 +387,83 @@ export class HostTerminalDecorator extends TerminalDecorator {
             cmp.minimized = true
           })
         }
+
+        // 注入 Tabby 原生 SSH 连接能力（通过 ProfilesService 打开 SSH 标签页）
+        const tryNativeSSH = (sshHost: string, port: number, user: string, password: string): boolean => {
+          const partialProfile = {
+            type: 'ssh',
+            name: sshHost,
+            options: {
+              host: sshHost,
+              port: port,
+              user: user,
+              auth: password ? 'password' : null,
+              password: password || undefined,
+            },
+          }
+
+          // 路径 1：ProfilesService.openNewTabForProfile（Tabby 原生方式）
+          try {
+            const profilesService = this.injector.get(ProfilesService)
+            if (profilesService?.openNewTabForProfile) {
+              profilesService.openNewTabForProfile(partialProfile)
+              console.log('[Host+] Native SSH via ProfilesService')
+              return true
+            }
+          } catch (e1) { /* continue */ }
+
+          // 路径 2：quickConnect（Tabby 快速连接 API）
+          try {
+            const profilesService = this.injector.get(ProfilesService)
+            if (profilesService?.quickConnect) {
+              const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`
+              profilesService.quickConnect(query)
+              console.log('[Host+] Native SSH via quickConnect:', query)
+              return true
+            }
+          } catch (e2) { /* continue */ }
+
+          // 路径 3：AppService.openNewTab（旧版兼容）
+          try {
+            const appService = this.injector.get(AppService)
+            if (appService?.openNewTab) {
+              const profilesService = this.injector.get(ProfilesService)
+              profilesService.newTabParametersForProfile(partialProfile).then((params: any) => {
+                if (params) {
+                  appService.openNewTab(params)
+                  console.log('[Host+] Native SSH via AppService + newTabParametersForProfile')
+                }
+              })
+              return true
+            }
+          } catch (e3) { /* continue */ }
+
+          // 路径 4：扫描 injector 层级
+          try {
+            let inj: any = this.injector
+            while (inj) {
+              if (typeof inj.get === 'function') {
+                try {
+                  const records = inj._records || inj.records || {}
+                  for (const token of Object.values(records) as any[]) {
+                    try {
+                      const svc = inj.get(token.token || token)
+                      if (svc && typeof svc.openNewTabForProfile === 'function') {
+                        svc.openNewTabForProfile(partialProfile)
+                        console.log('[Host+] Native SSH via injector scan')
+                        return true
+                      }
+                    } catch {}
+                  }
+                } catch {}
+              }
+              inj = inj.parent
+            }
+          } catch (e4) { /* continue */ }
+
+          return false
+        }
+        cmp.openSSHTab = tryNativeSSH
 
         this.appRef.attachView(cmpRef.hostView)
         cmpRef.changeDetectorRef.detectChanges()

@@ -10,6 +10,14 @@ declare module 'tabby-core' {
     openNewTab(options: any): any
     closeTab(tab: any): void
   }
+  export class ProfilesService {
+    openNewTabForProfile(profile: any): Promise<any>
+    newTabParametersForProfile(profile: any): Promise<any>
+    getProviders(): any[]
+    getProfiles(): Promise<any[]>
+    quickConnect(query: string): Promise<any>
+    launchProfile(profile: any): Promise<void>
+  }
   export class NotificationsService {
     error(title: string, message: string): void
     notice(title: string, message?: string): void

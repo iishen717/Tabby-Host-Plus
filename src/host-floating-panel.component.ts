@@ -63,7 +63,7 @@ import { HostI18nService } from './host-i18n.service'
         <div class="hp-quick-bar" *ngIf="pinnedHosts.length > 0" (wheel)="onQuickBarWheel($event)">
           <div class="hp-quick-host" *ngFor="let phost of pinnedHosts"
             (click)="connectToHost(phost)" [title]="phost.host">
-            <span class="hp-quick-icon">&#x1F5A5;</span>
+            <span class="hp-quick-icon">&#x2691;</span>
             <span class="hp-quick-name">{{ phost.name }}</span>
           </div>
         </div>
@@ -106,10 +106,9 @@ import { HostI18nService } from './host-i18n.service'
                 <div class="hp-host-body">
                   <span class="hp-host-name">{{ host.name }}</span>
                   <div class="hp-host-details">
-                    <span class="hp-host-detail" *ngIf="host.host" [title]="i18n.t('host.host')">&#x1F310; {{ host.host }}</span>
-                    <span class="hp-host-detail" *ngIf="host.ip" [title]="i18n.t('host.ip')">&#x1F4CD; {{ host.ip }}</span>
+                    <span class="hp-host-detail hp-host-addr" *ngIf="host.host" [title]="i18n.t('host.host')">{{ host.host }}</span>
                     <span class="hp-host-detail hp-host-port" *ngIf="host.port && host.port !== 22" [title]="i18n.t('host.port')">:{{ host.port }}</span>
-                    <span class="hp-host-detail" *ngIf="host.username" [title]="i18n.t('host.username')">&#x1F464; {{ host.username }}</span>
+                    <span class="hp-host-detail hp-host-user" *ngIf="host.username" [title]="i18n.t('host.username')">{{ host.username }}</span>
                   </div>
                   <span class="hp-host-remark" *ngIf="host.remark" [title]="host.remark">{{ host.remark }}</span>
                 </div>
@@ -117,7 +116,7 @@ import { HostI18nService } from './host-i18n.service'
                   <span class="hp-host-act" (click)="togglePin(host); $event.stopPropagation()"
                     [title]="host.pinned ? i18n.t('panel.unpin') : i18n.t('panel.pin')"
                     [class.active]="host.pinned">&#x2691;</span>
-                  <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x1F517;</span>
+                  <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x23CE;</span>
                   <span class="hp-host-act" (click)="editHost(host); $event.stopPropagation()" [title]="i18n.t('panel.edit')">&#x270E;</span>
                   <span class="hp-host-act hp-host-act-del" (click)="deleteHost(host); $event.stopPropagation()" [title]="i18n.t('panel.delete')">&#x2715;</span>
                 </div>
@@ -131,7 +130,7 @@ import { HostI18nService } from './host-i18n.service'
             <span>{{ i18n.t('app.noresults') }}</span>
           </div>
           <div class="hp-empty" *ngIf="filteredHosts.length === 0 && !searchText">
-            <span class="hp-empty-icon">&#x1F5A5;</span>
+            <span class="hp-empty-icon">&#x2328;</span>
             <span>{{ i18n.t('panel.hint.search') }}</span>
           </div>
         </div>
@@ -186,10 +185,6 @@ import { HostI18nService } from './host-i18n.service'
           <label class="hp-field-label">{{ i18n.t('host.host') }}</label>
           <input class="hp-field-input" type="text" [(ngModel)]="editHostEntry.host" (keydown.enter)="saveEditHost()" placeholder="e.g. 192.168.1.100 or example.com">
         </div>
-        <div class="hp-field">
-          <label class="hp-field-label">{{ i18n.t('host.ip') }}</label>
-          <input class="hp-field-input" type="text" [(ngModel)]="editHostEntry.ip" (keydown.enter)="saveEditHost()" placeholder="e.g. 192.168.1.100">
-        </div>
         <div class="hp-field-row">
           <div class="hp-field hp-field-half">
             <label class="hp-field-label">{{ i18n.t('host.port') }}</label>
@@ -199,6 +194,10 @@ import { HostI18nService } from './host-i18n.service'
             <label class="hp-field-label">{{ i18n.t('host.username') }}</label>
             <input class="hp-field-input" type="text" [(ngModel)]="editHostEntry.username" (keydown.enter)="saveEditHost()" placeholder="e.g. root">
           </div>
+        </div>
+        <div class="hp-field">
+          <label class="hp-field-label">{{ t('密码', 'Password') }}</label>
+          <input class="hp-field-input" type="password" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" placeholder="SSH 登录密码（不会在主面板显示）">
         </div>
         <div class="hp-field">
           <label class="hp-field-label">{{ i18n.t('host.remark') }}</label>
@@ -613,10 +612,18 @@ import { HostI18nService } from './host-i18n.service'
       font-size: 0.72em;
       color: var(--_text-secondary);
       white-space: nowrap;
+    }
+    .hp-host-addr {
       font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
     }
+    .hp-host-user {
+      color: var(--_primary);
+      font-weight: 500;
+    }
+    .hp-host-user::before { content: '@'; margin-right: 1px; opacity: 0.6; }
     .hp-host-port {
       color: var(--_text-muted);
+      font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
     }
     .hp-host-remark {
       display: block; font-size: 0.72em;
@@ -870,6 +877,9 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   svc = new HostDataService()
   i18n = new HostI18nService()
 
+  /** 由 TerminalDecorator 注入，用于调用 Tabby 原生 SSH 连接 */
+  openSSHTab: ((host: string, port: number, user: string, password: string) => boolean) | null = null
+
   private destroyed = false
   minimized = false
   panelX = 20
@@ -1069,7 +1079,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     el.scrollLeft += event.deltaY
   }
 
-  /** 连接到主机 — 尝试通过 SSH 连接 */
+  /** 连接到主机 — 优先 Tabby 原生 SSH 新建标签页，回退 CLI ssh */
   connectToHost(host: HostEntry): void {
     if (!host || this.destroyed) return
     this.svc.incrementUsage(host.id)
@@ -1082,38 +1092,22 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
 
     if (!targetHost) return
 
-    // 构建 SSH 命令
-    const sshCmd = port !== 22
-      ? `ssh ${username}@${targetHost} -p ${port}`
-      : `ssh ${username}@${targetHost}`
+    // 方式 1：Tabby 原生 SSH — 新建标签页（ProfilesService / AppService）
+    if (this.openSSHTab) {
+      const ok = this.openSSHTab(targetHost, port, username, host.password || '')
+      if (ok) return
+    }
 
-    // 尝试通过 Tabby 的 AppService 打开新 SSH 标签页
-    try {
-      const appService = (this.terminalRef as any)?._injector?.get?.(
-        (this.terminalRef as any)?._injector?.constructor?.name === 'Injector'
-          ? null : null
-      )
-    } catch {}
+    // 方式 2：CLI 兜底 — 仅当原生方式不可用时
+    const portOpt = port !== 22 ? ` -p ${port}` : ''
+    const sshCmd = `ssh ${username}@${targetHost}${portOpt}`
 
-    // 方式1：尝试在当前终端发送 SSH 命令
     if (this.terminalRef) {
       this.sendToTerminal(sshCmd + '\n')
       return
     }
 
-    // 方式2：尝试通过全局 injector 创建新连接
-    try {
-      const electron = (window as any).require?.('electron')
-      if (electron?.shell) {
-        electron.shell.openExternal(`ssh://${username}@${targetHost}:${port}`)
-        return
-      }
-    } catch {}
-
-    // 兜底：复制到剪贴板
-    try {
-      navigator.clipboard?.writeText(sshCmd)
-    } catch {}
+    try { navigator.clipboard?.writeText(sshCmd) } catch {}
   }
 
   /** 发送文本到终端 */
@@ -1153,7 +1147,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   }
 
   showEditModal = false
-  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', remark: '' }
+  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '' }
 
   showGroupRename = false
   groupRenameIsNew = false
@@ -1162,12 +1156,12 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   groupRenameOrder = 0
 
   addHost(): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', remark: '', group: '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '', group: '', pinned: false }
     this.showEditModal = true
   }
 
   addHostToGroup(groupName: string): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', remark: '', group: groupName || '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '', group: groupName || '', pinned: false }
     this.showEditModal = true
   }
 
@@ -1194,9 +1188,10 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     const updateData = {
       name: this.editHostEntry.name.trim(),
       host: (this.editHostEntry.host || '').trim(),
-      ip: (this.editHostEntry.ip || '').trim(),
+      ip: (this.editHostEntry.host || '').trim(),
       port: +(this.editHostEntry.port || 22),
       username: (this.editHostEntry.username || '').trim(),
+      password: (this.editHostEntry.password || '').trim(),
       remark: (this.editHostEntry.remark || '').trim(),
       group: this.editHostEntry.group || '',
       pinned: !!this.editHostEntry.pinned,
@@ -1489,4 +1484,9 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   }
 
   noBubble(event: MouseEvent): void { event.stopPropagation() }
+
+  /** 快捷翻译方法（供模板使用） */
+  t(zh: string, en: string): string {
+    return this.i18n.getLocale() === 'en-US' ? en : zh
+  }
 }

@@ -9,6 +9,7 @@ export interface HostEntry {
   ip: string           // IP 地址
   port: number         // 端口（默认 22）
   username: string     // 用户名
+  password: string     // 密码（仅用于连接，不在主面板显示）
   remark: string       // 备注
   group: string        // 分组名，空字符串表示未分组
   color?: string       // 显示颜色（可选）
