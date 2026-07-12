@@ -112,8 +112,8 @@ import { HostI18nService } from './host-i18n.service'
                   <span class="hp-host-remark" *ngIf="host.remark" [title]="host.remark">{{ host.remark }}</span>
                 </div>
                 <div class="hp-host-actions">
-                  <span class="hp-host-act hp-host-act-copy" (click)="copyHost(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_host')">&#x2398;</span>
-                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x1F512;</span>
+                  <span class="hp-host-act hp-host-act-copy" (click)="copyHost(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_host')">&#x2750;</span>
+                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x25A3;</span>
                   <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x23CE;</span>
                   <span class="hp-host-act" (click)="editHost(host); $event.stopPropagation()" [title]="i18n.t('panel.edit')">&#x270E;</span>
                   <span class="hp-host-act hp-host-act-del" (click)="deleteHost(host); $event.stopPropagation()" [title]="i18n.t('panel.delete')">&#x2715;</span>
@@ -197,7 +197,7 @@ import { HostI18nService } from './host-i18n.service'
           <label class="hp-field-label">{{ t('密码', 'Password') }}</label>
           <div class="hp-password-wrap">
             <input class="hp-field-input hp-password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" placeholder="SSH 登录密码（不会在主面板显示）">
-            <span class="hp-password-eye" (click)="showPassword = !showPassword; $event.stopPropagation()" [title]="showPassword ? t('隐藏密码', 'Hide') : t('显示密码', 'Show')">{{ showPassword ? '&#x1F441;' : '&#x1F576;' }}</span>
+            <span class="hp-password-eye" [class.active]="showPassword" (click)="showPassword = !showPassword; $event.stopPropagation()" [title]="showPassword ? t('隐藏密码', 'Hide') : t('显示密码', 'Show')">&#x25C9;</span>
           </div>
         </div>
         <div class="hp-field">
@@ -807,6 +807,8 @@ import { HostI18nService } from './host-i18n.service'
       transition: all 0.12s;
     }
     .hp-password-eye:hover { background: var(--_hover); color: var(--_text); }
+    .hp-password-eye.active { color: var(--_primary); }
+    .hp-password-eye.active:hover { color: var(--_primary); opacity: 0.8; }
 
     /* 复选框行 */
     .hp-check-row { display: flex; gap: 18px; margin: 12px 0; }
