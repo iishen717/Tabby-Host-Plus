@@ -28,20 +28,20 @@ export class HostTerminalDecorator extends TerminalDecorator {
   private applySavedTheme(): void {
     try {
       const root = document.documentElement
-      const savedFontSize = localStorage.getItem('hp-font-size') || localStorage.getItem('qc-plus-font-size')
-      if (savedFontSize && !root.style.getPropertyValue('--qc-font-size')) {
-        root.style.setProperty('--qc-font-size', savedFontSize + 'px')
+      const savedFontSize = localStorage.getItem('hp-font-size')
+      if (savedFontSize && !root.style.getPropertyValue('--hp-font-size')) {
+        root.style.setProperty('--hp-font-size', savedFontSize + 'px')
       }
 
-      const theme = localStorage.getItem('hp-theme') || localStorage.getItem('qc-plus-theme')
+      const theme = localStorage.getItem('hp-theme')
       if (!theme || theme === '') return
 
       const keys = ['primary', 'bg', 'text', 'border', 'surface', 'hover', 'input-bg', 'text-muted']
       let applied = false
       for (const k of keys) {
-        const val = localStorage.getItem(`hp-color-${k}`) || localStorage.getItem(`qc-plus-color-${k}`)
-        if (val && !root.style.getPropertyValue(`--qc-${k}`)) {
-          root.style.setProperty(`--qc-${k}`, val)
+        const val = localStorage.getItem(`hp-color-${k}`)
+        if (val && !root.style.getPropertyValue(`--hp-${k}`)) {
+          root.style.setProperty(`--hp-${k}`, val)
           applied = true
         }
       }
@@ -164,9 +164,9 @@ export class HostTerminalDecorator extends TerminalDecorator {
       cursor: move; user-select: none;
       display: flex; align-items: center; gap: 4px;
       padding: 3px 8px; border-radius: 6px;
-      background: var(--qc-surface, #45475a);
-      border: 0.5px solid var(--qc-primary, #b4befe);
-      font-size: var(--qc-font-size, 12px); color: var(--qc-primary, #b4befe);
+      background: var(--hp-surface, #45475a);
+      border: 0.5px solid var(--hp-primary, #b4befe);
+      font-size: var(--hp-font-size, 12px); color: var(--hp-primary, #b4befe);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       line-height: 1.4;
       pointer-events: auto;
@@ -174,7 +174,7 @@ export class HostTerminalDecorator extends TerminalDecorator {
       opacity: 0.85;
     `
     entry.title = i18n.t('entry.title')
-    entry.innerHTML = '@&nbsp;Host+ <span style="color:var(--qc-text-muted,#6c7086);font-size:calc(var(--qc-font-size,14px) - 1px);">&#x22EE;&#x22EE;</span>'
+    entry.innerHTML = '@&nbsp;Host+ <span style="color:var(--hp-text-muted,#6c7086);font-size:calc(var(--hp-font-size,14px) - 1px);">&#x22EE;&#x22EE;</span>'
 
     const mem = profileId ? hpSvc.getPositionMemory(profileId) : null
     if (mem) {
@@ -230,12 +230,12 @@ export class HostTerminalDecorator extends TerminalDecorator {
       btn.style.top = '8px'
       btn.style.right = '8px'
       btn.style.zIndex = '99997'
-      btn.style.border = '0.5px solid var(--qc-primary, #b4befe)'
+      btn.style.border = '0.5px solid var(--hp-primary, #b4befe)'
       btn.style.borderRadius = '6px'
       btn.style.padding = '3px 8px'
-      btn.style.background = 'var(--qc-surface, #45475a)'
-      btn.style.color = 'var(--qc-primary, #b4befe)'
-      btn.style.fontSize = 'var(--qc-font-size, 12px)'
+      btn.style.background = 'var(--hp-surface, #45475a)'
+      btn.style.color = 'var(--hp-primary, #b4befe)'
+      btn.style.fontSize = 'var(--hp-font-size, 12px)'
       btn.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
       btn.style.lineHeight = '1.4'
       btn.style.cursor = 'pointer'

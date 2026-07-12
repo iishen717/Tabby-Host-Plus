@@ -269,26 +269,26 @@ import { HostI18nService } from './host-i18n.service'
   `,
   styles: [`
     /* ========================================
-       CSS 自定义属性（继承自 :root 的 --qc-*，Host+ 复用 QuickCmd+ 的配色变量）
+       CSS 自定义属性（继承自 :root 的 --hp-*，Host+ 复用 QuickCmd+ 的配色变量）
        ======================================== */
     :host {
       display: contents;
-      --_bg: var(--qc-bg, rgba(22,22,28,0.72));
-      --_bg-rgb: var(--qc-bg-rgb, 22,22,28);
-      --_text: var(--qc-text, #e8e8e8);
-      --_text-secondary: var(--qc-text-secondary, #b0b0b0);
-      --_text-muted: var(--qc-text-muted, #7a7a8a);
-      --_primary: var(--qc-primary, #5b8def);
-      --_primary-rgb: var(--qc-primary-rgb, 91,141,239);
-      --_border: var(--qc-border, rgba(255,255,255,0.10));
-      --_surface: var(--qc-surface, rgba(255,255,255,0.06));
-      --_surface-rgb: var(--qc-surface-rgb, 255,255,255);
-      --_input-bg: var(--qc-input-bg, rgba(255,255,255,0.08));
-      --_hover: var(--qc-hover, rgba(255,255,255,0.08));
-      --_group-name: var(--qc-group-name, var(--_text-secondary));
-      --_shadow: var(--qc-shadow, 0 8px 40px rgba(0,0,0,0.42));
-      --_blur: var(--qc-blur, 24px);
-      --_saturate: var(--qc-saturate, 160%);
+      --_bg: var(--hp-bg, rgba(22,22,28,0.72));
+      --_bg-rgb: var(--hp-bg-rgb, 22,22,28);
+      --_text: var(--hp-text, #e8e8e8);
+      --_text-secondary: var(--hp-text-secondary, #b0b0b0);
+      --_text-muted: var(--hp-text-muted, #7a7a8a);
+      --_primary: var(--hp-primary, #5b8def);
+      --_primary-rgb: var(--hp-primary-rgb, 91,141,239);
+      --_border: var(--hp-border, rgba(255,255,255,0.10));
+      --_surface: var(--hp-surface, rgba(255,255,255,0.06));
+      --_surface-rgb: var(--hp-surface-rgb, 255,255,255);
+      --_input-bg: var(--hp-input-bg, rgba(255,255,255,0.08));
+      --_hover: var(--hp-hover, rgba(255,255,255,0.08));
+      --_group-name: var(--hp-group-name, var(--_text-secondary));
+      --_shadow: var(--hp-shadow, 0 8px 40px rgba(0,0,0,0.42));
+      --_blur: var(--hp-blur, 24px);
+      --_saturate: var(--hp-saturate, 160%);
       --_warning: #fab387;
       --_danger: #f38ba8;
       --_success: #a6e3a1;
@@ -310,7 +310,7 @@ import { HostI18nService } from './host-i18n.service'
       display: flex;
       flex-direction: column;
       user-select: none;
-      font-size: var(--qc-font-size, 14px);
+      font-size: var(--hp-font-size, 14px);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', system-ui, sans-serif;
       overflow: hidden;
       transition: box-shadow 0.25s ease;

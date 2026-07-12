@@ -13,19 +13,19 @@ import { HostTerminalDecorator } from './host-terminal-decorator'
 import { HostFloatingPanel } from './host-floating-panel.component'
 import { HostSettingsTabProvider, HostSettingsComponent } from './host-settings.component'
 
-/** 启动时应用已保存的颜色主题（复用 QuickCmd+ 的 --qc-* CSS 变量体系） */
+/** 启动时应用已保存的颜色主题（Host+ 独立 --hp-* 变量体系，不与 QuickCmd+ 共用） */
 function applySavedTheme(): void {
   try {
-    const theme = localStorage.getItem('hp-theme') || localStorage.getItem('qc-plus-theme')
+    const theme = localStorage.getItem('hp-theme')
     const root = document.documentElement
 
     const presets: Record<string, Record<string, string>> = {
-      'acrylic-light': { '--qc-primary':'#4f7dff','--qc-primary-rgb':'79,125,255','--qc-bg':'rgba(213,213,216,0.96)','--qc-bg-rgb':'213,213,216','--qc-text':'#162234','--qc-text-secondary':'#607188','--qc-text-muted':'#8c97ab','--qc-group-name':'#4a6080','--qc-border':'rgba(255,255,255,0.28)','--qc-surface':'rgba(255,255,255,0.34)','--qc-surface-rgb':'255,255,255','--qc-hover':'rgba(255,255,255,0.24)','--qc-input-bg':'rgba(255,255,255,0.52)','--qc-blur':'28px','--qc-saturate':'180%','--qc-shadow':'0 10px 38px rgba(0,0,0,0.16)' },
-      'acrylic-dark':  { '--qc-primary':'#5b8def','--qc-primary-rgb':'91,141,239','--qc-bg':'rgba(20,20,20,0.52)','--qc-bg-rgb':'20,20,20','--qc-text':'#e8e8e8','--qc-text-secondary':'#b2b2b2','--qc-text-muted':'#8f8f8f','--qc-group-name':'#b2b2b2','--qc-border':'rgba(255,255,255,0.10)','--qc-surface':'rgba(45,45,45,0.42)','--qc-surface-rgb':'45,45,45','--qc-hover':'rgba(255,255,255,0.06)','--qc-input-bg':'rgba(255,255,255,0.08)','--qc-blur':'30px','--qc-saturate':'145%','--qc-shadow':'0 10px 38px rgba(0,0,0,0.40)' },
-      'ocean':  { '--qc-primary':'#22d3ee','--qc-primary-rgb':'34,211,238','--qc-bg':'rgba(8,24,48,0.60)','--qc-bg-rgb':'8,24,48','--qc-text':'#e0f0ff','--qc-text-secondary':'#90b8e0','--qc-text-muted':'#5888b8','--qc-group-name':'#90b8e0','--qc-border':'rgba(100,180,240,0.14)','--qc-surface':'rgba(20,50,90,0.35)','--qc-surface-rgb':'20,50,90','--qc-hover':'rgba(100,160,220,0.08)','--qc-input-bg':'rgba(10,30,60,0.50)','--qc-blur':'26px','--qc-saturate':'170%','--qc-shadow':'0 10px 38px rgba(0,40,80,0.40)' },
-      'forest': { '--qc-primary':'#34d399','--qc-primary-rgb':'52,211,153','--qc-bg':'rgba(8,28,16,0.58)','--qc-bg-rgb':'8,28,16','--qc-text':'#d8f8e0','--qc-text-secondary':'#80c898','--qc-text-muted':'#509868','--qc-group-name':'#80c898','--qc-border':'rgba(80,180,120,0.12)','--qc-surface':'rgba(16,50,28,0.35)','--qc-surface-rgb':'16,50,28','--qc-hover':'rgba(80,160,100,0.08)','--qc-input-bg':'rgba(8,30,16,0.48)','--qc-blur':'26px','--qc-saturate':'155%','--qc-shadow':'0 10px 38px rgba(0,30,10,0.40)' },
-      'sunset': { '--qc-primary':'#fb923c','--qc-primary-rgb':'251,146,60','--qc-bg':'rgba(40,16,8,0.62)','--qc-bg-rgb':'40,16,8','--qc-text':'#ffe8d8','--qc-text-secondary':'#d0a088','--qc-text-muted':'#a07058','--qc-group-name':'#d0a088','--qc-border':'rgba(200,120,80,0.14)','--qc-surface':'rgba(60,24,12,0.38)','--qc-surface-rgb':'60,24,12','--qc-hover':'rgba(200,100,60,0.08)','--qc-input-bg':'rgba(30,10,4,0.50)','--qc-blur':'24px','--qc-saturate':'150%','--qc-shadow':'0 10px 38px rgba(40,10,0,0.40)' },
-      'lavender': { '--qc-primary':'#a78bfa','--qc-primary-rgb':'167,139,250','--qc-bg':'rgba(22,14,36,0.58)','--qc-bg-rgb':'22,14,36','--qc-text':'#ece0fc','--qc-text-secondary':'#b098d0','--qc-text-muted':'#7a60a8','--qc-group-name':'#b098d0','--qc-border':'rgba(150,120,210,0.14)','--qc-surface':'rgba(36,22,58,0.38)','--qc-surface-rgb':'36,22,58','--qc-hover':'rgba(140,100,200,0.08)','--qc-input-bg':'rgba(18,10,30,0.50)','--qc-blur':'28px','--qc-saturate':'160%','--qc-shadow':'0 10px 38px rgba(20,10,30,0.40)' },
+      'acrylic-light': { '--hp-primary':'#4f7dff','--hp-primary-rgb':'79,125,255','--hp-bg':'rgba(213,213,216,0.96)','--hp-bg-rgb':'213,213,216','--hp-text':'#162234','--hp-text-secondary':'#607188','--hp-text-muted':'#8c97ab','--hp-group-name':'#4a6080','--hp-border':'rgba(255,255,255,0.28)','--hp-surface':'rgba(255,255,255,0.34)','--hp-surface-rgb':'255,255,255','--hp-hover':'rgba(255,255,255,0.24)','--hp-input-bg':'rgba(255,255,255,0.52)','--hp-blur':'28px','--hp-saturate':'180%','--hp-shadow':'0 10px 38px rgba(0,0,0,0.16)' },
+      'acrylic-dark':  { '--hp-primary':'#5b8def','--hp-primary-rgb':'91,141,239','--hp-bg':'rgba(20,20,20,0.52)','--hp-bg-rgb':'20,20,20','--hp-text':'#e8e8e8','--hp-text-secondary':'#b2b2b2','--hp-text-muted':'#8f8f8f','--hp-group-name':'#b2b2b2','--hp-border':'rgba(255,255,255,0.10)','--hp-surface':'rgba(45,45,45,0.42)','--hp-surface-rgb':'45,45,45','--hp-hover':'rgba(255,255,255,0.06)','--hp-input-bg':'rgba(255,255,255,0.08)','--hp-blur':'30px','--hp-saturate':'145%','--hp-shadow':'0 10px 38px rgba(0,0,0,0.40)' },
+      'ocean':  { '--hp-primary':'#22d3ee','--hp-primary-rgb':'34,211,238','--hp-bg':'rgba(8,24,48,0.60)','--hp-bg-rgb':'8,24,48','--hp-text':'#e0f0ff','--hp-text-secondary':'#90b8e0','--hp-text-muted':'#5888b8','--hp-group-name':'#90b8e0','--hp-border':'rgba(100,180,240,0.14)','--hp-surface':'rgba(20,50,90,0.35)','--hp-surface-rgb':'20,50,90','--hp-hover':'rgba(100,160,220,0.08)','--hp-input-bg':'rgba(10,30,60,0.50)','--hp-blur':'26px','--hp-saturate':'170%','--hp-shadow':'0 10px 38px rgba(0,40,80,0.40)' },
+      'forest': { '--hp-primary':'#34d399','--hp-primary-rgb':'52,211,153','--hp-bg':'rgba(8,28,16,0.58)','--hp-bg-rgb':'8,28,16','--hp-text':'#d8f8e0','--hp-text-secondary':'#80c898','--hp-text-muted':'#509868','--hp-group-name':'#80c898','--hp-border':'rgba(80,180,120,0.12)','--hp-surface':'rgba(16,50,28,0.35)','--hp-surface-rgb':'16,50,28','--hp-hover':'rgba(80,160,100,0.08)','--hp-input-bg':'rgba(8,30,16,0.48)','--hp-blur':'26px','--hp-saturate':'155%','--hp-shadow':'0 10px 38px rgba(0,30,10,0.40)' },
+      'sunset': { '--hp-primary':'#fb923c','--hp-primary-rgb':'251,146,60','--hp-bg':'rgba(40,16,8,0.62)','--hp-bg-rgb':'40,16,8','--hp-text':'#ffe8d8','--hp-text-secondary':'#d0a088','--hp-text-muted':'#a07058','--hp-group-name':'#d0a088','--hp-border':'rgba(200,120,80,0.14)','--hp-surface':'rgba(60,24,12,0.38)','--hp-surface-rgb':'60,24,12','--hp-hover':'rgba(200,100,60,0.08)','--hp-input-bg':'rgba(30,10,4,0.50)','--hp-blur':'24px','--hp-saturate':'150%','--hp-shadow':'0 10px 38px rgba(40,10,0,0.40)' },
+      'lavender': { '--hp-primary':'#a78bfa','--hp-primary-rgb':'167,139,250','--hp-bg':'rgba(22,14,36,0.58)','--hp-bg-rgb':'22,14,36','--hp-text':'#ece0fc','--hp-text-secondary':'#b098d0','--hp-text-muted':'#7a60a8','--hp-group-name':'#b098d0','--hp-border':'rgba(150,120,210,0.14)','--hp-surface':'rgba(36,22,58,0.38)','--hp-surface-rgb':'36,22,58','--hp-hover':'rgba(140,100,200,0.08)','--hp-input-bg':'rgba(18,10,30,0.50)','--hp-blur':'28px','--hp-saturate':'160%','--hp-shadow':'0 10px 38px rgba(20,10,30,0.40)' },
     }
 
     if (theme && presets[theme]) {
@@ -46,18 +46,18 @@ function applySavedTheme(): void {
       ]
       let applied = false
       for (const k of keys) {
-        const val = localStorage.getItem(`hp-color-${k}`) || localStorage.getItem(`qc-plus-color-${k}`)
-        if (val) { root.style.setProperty(`--qc-${k}`, val); applied = true }
+        const val = localStorage.getItem(`hp-color-${k}`)
+        if (val) { root.style.setProperty(`--hp-${k}`, val); applied = true }
       }
       if (applied) console.log('[Host+] Custom glass theme applied')
       return
     }
 
     const allVars = [
-      '--qc-primary','--qc-primary-rgb','--qc-bg','--qc-bg-rgb',
-      '--qc-text','--qc-text-secondary','--qc-text-muted','--qc-group-name',
-      '--qc-border','--qc-surface','--qc-surface-rgb',
-      '--qc-hover','--qc-input-bg','--qc-blur','--qc-saturate','--qc-shadow'
+      '--hp-primary','--hp-primary-rgb','--hp-bg','--hp-bg-rgb',
+      '--hp-text','--hp-text-secondary','--hp-text-muted','--hp-group-name',
+      '--hp-border','--hp-surface','--hp-surface-rgb',
+      '--hp-hover','--hp-input-bg','--hp-blur','--hp-saturate','--hp-shadow'
     ]
     allVars.forEach(v => root.style.removeProperty(v))
   } catch { /* ignore */ }

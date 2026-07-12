@@ -276,37 +276,37 @@ function detectSystemLocale(): 'zh-CN' | 'en-US' {
     .hs-entry-mode-option {
       display:flex; align-items:center; gap:4px;
       padding:6px 12px; border-radius:6px;
-      border:0.5px solid var(--qc-border,#585b70);
+      border:0.5px solid var(--hp-border,#585b70);
       cursor:pointer; transition:all .15s;
       user-select:none;
     }
-    .hs-entry-mode-option:hover { border-color:var(--qc-primary,#b4befe); }
-    .hs-entry-mode-active { border-color:var(--qc-primary,#b4befe); background:rgba(180,190,254,0.08); }
+    .hs-entry-mode-option:hover { border-color:var(--hp-primary,#b4befe); }
+    .hs-entry-mode-active { border-color:var(--hp-primary,#b4befe); background:rgba(180,190,254,0.08); }
     .hs-entry-mode-option input { margin:0; }
 
     /* 字体大小 */
     .hs-font-row { margin-top:12px; display:flex; flex-direction:column; gap:4px; }
     .hs-font-label { font-size:13px; font-weight:500; }
     .hs-font-control { display:flex; align-items:center; gap:10px; }
-    .hs-font-val { font-size:13px; min-width:30px; color:var(--qc-text-muted); font-variant-numeric:tabular-nums; }
-    .hs-range { flex:1; max-width:160px; margin:0; height:4px; -webkit-appearance:none; appearance:none; background:var(--qc-border,#585b70); border-radius:2px; outline:none; cursor:pointer; }
-    .hs-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%; background:var(--qc-primary,#b4befe); border:2px solid var(--qc-surface,#45475a); cursor:pointer; }
-    .hs-range::-moz-range-track { height:4px; background:var(--qc-border,#585b70); border-radius:2px; }
-    .hs-range::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--qc-primary,#b4befe); border:2px solid var(--qc-surface,#45475a); cursor:pointer; }
+    .hs-font-val { font-size:13px; min-width:30px; color:var(--hp-text-muted); font-variant-numeric:tabular-nums; }
+    .hs-range { flex:1; max-width:160px; margin:0; height:4px; -webkit-appearance:none; appearance:none; background:var(--hp-border,#585b70); border-radius:2px; outline:none; cursor:pointer; }
+    .hs-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:14px; height:14px; border-radius:50%; background:var(--hp-primary,#b4befe); border:2px solid var(--hp-surface,#45475a); cursor:pointer; }
+    .hs-range::-moz-range-track { height:4px; background:var(--hp-border,#585b70); border-radius:2px; }
+    .hs-range::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--hp-primary,#b4befe); border:2px solid var(--hp-surface,#45475a); cursor:pointer; }
 
     /* 关于 */
     .hs-about-row { display:flex; gap:16px; flex-wrap:wrap; margin-top:4px; font-size:13px; }
-    .hs-about-item { color:var(--qc-text-muted); }
-    .hs-about-link { color:var(--qc-primary,#b4befe); text-decoration:none; cursor:pointer; }
+    .hs-about-item { color:var(--hp-text-muted); }
+    .hs-about-link { color:var(--hp-primary,#b4befe); text-decoration:none; cursor:pointer; }
     .hs-about-link:hover { text-decoration:underline; }
     .hs-about-link svg { width:12px; height:12px; vertical-align:middle; margin-right:2px; }
 
     /* 确认弹窗 */
     .hp-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:100000; display:flex; align-items:center; justify-content:center; }
     .hp-edit-modal {
-      background:var(--qc-bg,#313244); border:0; border-radius:12px; padding:20px; z-index:100001;
+      background:var(--hp-bg,#313244); border:0; border-radius:12px; padding:20px; z-index:100001;
       min-width:380px; max-width:90%;
-      color:var(--qc-text,#cdd6f4);
+      color:var(--hp-text,#cdd6f4);
     }
     .hp-edit-title { font-size:16px; font-weight:600; margin-bottom:16px; }
     .hp-edit-field { margin-bottom:16px; }
@@ -338,7 +338,7 @@ export class HostSettingsComponent {
     { value: 'lavender', label: '薰衣草紫', bg: 'rgba(22,14,36,0.58)', bgRgb: '22,14,36', text: '#ece0fc', textSecondary: '#b098d0', textMuted: '#7a60a8', groupName: '#b098d0', primary: '#a78bfa', primaryRgb: '167,139,250', surface: 'rgba(36,22,58,0.38)', surfaceRgb: '36,22,58', border: 'rgba(150,120,210,0.14)', inputBg: 'rgba(18,10,30,0.50)', hover: 'rgba(140,100,200,0.08)', blur: '28px', saturate: '160%', shadow: '0 10px 38px rgba(20,10,30,0.40)' },
     { value: 'custom', label: '自定义', bg: 'rgba(22,22,28,0.72)', bgRgb: '22,22,28', text: '#e8e8e8', textSecondary: '#b0b0b0', textMuted: '#7a7a8a', groupName: '#b0b0b0', primary: '#5b8def', primaryRgb: '91,141,239', surface: 'rgba(255,255,255,0.06)', surfaceRgb: '255,255,255', border: 'rgba(255,255,255,0.10)', inputBg: 'rgba(255,255,255,0.08)', hover: 'rgba(255,255,255,0.06)', blur: '24px', saturate: '160%', shadow: '0 8px 40px rgba(0,0,0,0.42)' },
   ]
-  colorTheme: string = localStorage.getItem('hp-theme') || localStorage.getItem('qc-plus-theme') || ''
+  colorTheme: string = localStorage.getItem('hp-theme') || ''
   colorPrimary: string = localStorage.getItem('hp-color-primary') || ''
   colorPrimaryRgb: string = localStorage.getItem('hp-color-primary-rgb') || ''
   colorBg: string = localStorage.getItem('hp-color-bg') || ''
@@ -356,7 +356,7 @@ export class HostSettingsComponent {
   colorSaturate: string = localStorage.getItem('hp-color-saturate') || ''
   colorShadow: string = localStorage.getItem('hp-color-shadow') || ''
 
-  fontSize: number = +(localStorage.getItem('hp-font-size') || localStorage.getItem('qc-plus-font-size') || '14')
+  fontSize: number = +(localStorage.getItem('hp-font-size') || '14')
 
   entryMode: 'floating' | 'toolbar' = new HostDataService().getEntryMode()
 
@@ -399,7 +399,7 @@ export class HostSettingsComponent {
       const root = document.documentElement
       const apply = (prop: string, key: string) => {
         const val = localStorage.getItem(`hp-color-${key}`)
-        if (val) root.style.setProperty(`--qc-${prop}`, val)
+        if (val) root.style.setProperty(`--hp-${prop}`, val)
       }
       apply('primary', 'primary')
       apply('primary-rgb', 'primary-rgb')
@@ -418,9 +418,9 @@ export class HostSettingsComponent {
       apply('saturate', 'saturate')
       apply('shadow', 'shadow')
     }
-    const savedFontSize = localStorage.getItem('hp-font-size') || localStorage.getItem('qc-plus-font-size')
+    const savedFontSize = localStorage.getItem('hp-font-size')
     if (savedFontSize) {
-      document.documentElement.style.setProperty('--qc-font-size', savedFontSize + 'px')
+      document.documentElement.style.setProperty('--hp-font-size', savedFontSize + 'px')
     }
   }
 
@@ -443,9 +443,8 @@ export class HostSettingsComponent {
   onFontSizeChange(val: number): void {
     this.fontSize = Math.max(11, Math.min(18, val))
     localStorage.setItem('hp-font-size', String(this.fontSize))
-    localStorage.setItem('qc-plus-font-size', String(this.fontSize))
     const root = document.documentElement
-    root.style.setProperty('--qc-font-size', this.fontSize + 'px')
+    root.style.setProperty('--hp-font-size', this.fontSize + 'px')
     this.notifyPanels()
   }
 
@@ -480,7 +479,6 @@ export class HostSettingsComponent {
   setColorTheme(value: string): void {
     this.colorTheme = value
     localStorage.setItem('hp-theme', value)
-    localStorage.setItem('qc-plus-theme', value)
 
     if (value === 'custom') {
       const savedPrimary = localStorage.getItem('hp-color-primary')
@@ -522,22 +520,22 @@ export class HostSettingsComponent {
     const p = this.colorThemes.find(t => t.value === value)
     if (value && p) {
       const root = document.documentElement
-      root.style.setProperty('--qc-primary', p.primary)
-      root.style.setProperty('--qc-primary-rgb', p.primaryRgb)
-      root.style.setProperty('--qc-bg', p.bg)
-      root.style.setProperty('--qc-bg-rgb', p.bgRgb)
-      root.style.setProperty('--qc-text', p.text)
-      root.style.setProperty('--qc-text-secondary', p.textSecondary)
-      root.style.setProperty('--qc-text-muted', p.textMuted)
-      root.style.setProperty('--qc-border', p.border)
-      root.style.setProperty('--qc-surface', p.surface)
-      root.style.setProperty('--qc-surface-rgb', p.surfaceRgb)
-      root.style.setProperty('--qc-hover', p.hover)
-      root.style.setProperty('--qc-input-bg', p.inputBg)
-      root.style.setProperty('--qc-blur', p.blur)
-      root.style.setProperty('--qc-saturate', p.saturate)
-      root.style.setProperty('--qc-shadow', p.shadow)
-      if (p.groupName) root.style.setProperty('--qc-group-name', p.groupName)
+      root.style.setProperty('--hp-primary', p.primary)
+      root.style.setProperty('--hp-primary-rgb', p.primaryRgb)
+      root.style.setProperty('--hp-bg', p.bg)
+      root.style.setProperty('--hp-bg-rgb', p.bgRgb)
+      root.style.setProperty('--hp-text', p.text)
+      root.style.setProperty('--hp-text-secondary', p.textSecondary)
+      root.style.setProperty('--hp-text-muted', p.textMuted)
+      root.style.setProperty('--hp-border', p.border)
+      root.style.setProperty('--hp-surface', p.surface)
+      root.style.setProperty('--hp-surface-rgb', p.surfaceRgb)
+      root.style.setProperty('--hp-hover', p.hover)
+      root.style.setProperty('--hp-input-bg', p.inputBg)
+      root.style.setProperty('--hp-blur', p.blur)
+      root.style.setProperty('--hp-saturate', p.saturate)
+      root.style.setProperty('--hp-shadow', p.shadow)
+      if (p.groupName) root.style.setProperty('--hp-group-name', p.groupName)
     } else {
       this.colorPrimary = ''
       this.colorBg = ''
@@ -549,7 +547,6 @@ export class HostSettingsComponent {
 
   applyColorTheme(): void {
     localStorage.setItem('hp-theme', 'custom')
-    localStorage.setItem('qc-plus-theme', 'custom')
     this.colorTheme = 'custom'
     this.saveColorVars()
     this.notifyPanels()
@@ -572,22 +569,22 @@ export class HostSettingsComponent {
 
   private saveColorVars(p?: any): void {
     const root = document.documentElement
-    root.style.setProperty('--qc-primary', p?.primary ?? this.colorPrimary)
-    root.style.setProperty('--qc-primary-rgb', p?.primaryRgb ?? this.colorPrimaryRgb)
-    root.style.setProperty('--qc-bg', p?.bg ?? this.colorBg)
-    root.style.setProperty('--qc-bg-rgb', p?.bgRgb ?? this.colorBgRgb)
-    root.style.setProperty('--qc-text', p?.text ?? this.colorText)
-    root.style.setProperty('--qc-text-secondary', p?.textSecondary ?? this.colorTextSecondary)
-    root.style.setProperty('--qc-text-muted', p?.textMuted ?? this.colorMuted)
-    root.style.setProperty('--qc-border', p?.border ?? this.colorBorder)
-    root.style.setProperty('--qc-surface', p?.surface ?? this.colorSurface)
-    root.style.setProperty('--qc-surface-rgb', p?.surfaceRgb ?? this.colorSurfaceRgb)
-    root.style.setProperty('--qc-hover', p?.hover ?? this.colorHover)
-    root.style.setProperty('--qc-input-bg', p?.inputBg ?? this.colorInputBg)
-    root.style.setProperty('--qc-blur', p?.blur ?? this.colorBlur)
-    root.style.setProperty('--qc-saturate', p?.saturate ?? this.colorSaturate)
-    root.style.setProperty('--qc-shadow', p?.shadow ?? this.colorShadow)
-    root.style.setProperty('--qc-group-name', p?.groupName ?? this.colorGroupName)
+    root.style.setProperty('--hp-primary', p?.primary ?? this.colorPrimary)
+    root.style.setProperty('--hp-primary-rgb', p?.primaryRgb ?? this.colorPrimaryRgb)
+    root.style.setProperty('--hp-bg', p?.bg ?? this.colorBg)
+    root.style.setProperty('--hp-bg-rgb', p?.bgRgb ?? this.colorBgRgb)
+    root.style.setProperty('--hp-text', p?.text ?? this.colorText)
+    root.style.setProperty('--hp-text-secondary', p?.textSecondary ?? this.colorTextSecondary)
+    root.style.setProperty('--hp-text-muted', p?.textMuted ?? this.colorMuted)
+    root.style.setProperty('--hp-border', p?.border ?? this.colorBorder)
+    root.style.setProperty('--hp-surface', p?.surface ?? this.colorSurface)
+    root.style.setProperty('--hp-surface-rgb', p?.surfaceRgb ?? this.colorSurfaceRgb)
+    root.style.setProperty('--hp-hover', p?.hover ?? this.colorHover)
+    root.style.setProperty('--hp-input-bg', p?.inputBg ?? this.colorInputBg)
+    root.style.setProperty('--hp-blur', p?.blur ?? this.colorBlur)
+    root.style.setProperty('--hp-saturate', p?.saturate ?? this.colorSaturate)
+    root.style.setProperty('--hp-shadow', p?.shadow ?? this.colorShadow)
+    root.style.setProperty('--hp-group-name', p?.groupName ?? this.colorGroupName)
     const keys = [
       { k: 'primary', v: p?.primary ?? this.colorPrimary },
       { k: 'primary-rgb', v: p?.primaryRgb ?? this.colorPrimaryRgb },
@@ -608,14 +605,13 @@ export class HostSettingsComponent {
     ]
     keys.forEach(({ k, v }) => {
       localStorage.setItem(`hp-color-${k}`, v)
-      localStorage.setItem(`qc-plus-color-${k}`, v)
     })
   }
 
   private clearColorVars(): void {
     const root = document.documentElement
-    const vars = ['--qc-primary','--qc-primary-rgb','--qc-bg','--qc-bg-rgb','--qc-text','--qc-text-secondary','--qc-text-muted',
-      '--qc-group-name','--qc-border','--qc-surface','--qc-surface-rgb','--qc-hover','--qc-input-bg','--qc-blur','--qc-saturate','--qc-shadow']
+    const vars = ['--hp-primary','--hp-primary-rgb','--hp-bg','--hp-bg-rgb','--hp-text','--hp-text-secondary','--hp-text-muted',
+      '--hp-group-name','--hp-border','--hp-surface','--hp-surface-rgb','--hp-hover','--hp-input-bg','--hp-blur','--hp-saturate','--hp-shadow']
     vars.forEach(v => root.style.removeProperty(v))
     const allKeys = ['hp-color-primary','hp-color-primary-rgb','hp-color-bg','hp-color-bg-rgb',
       'hp-color-text','hp-color-text-secondary','hp-color-text-muted','hp-color-group-name',
@@ -689,7 +685,6 @@ export class HostSettingsComponent {
       }
       this.colorTheme = 'custom'
       localStorage.setItem('hp-theme', 'custom')
-      localStorage.setItem('qc-plus-theme', 'custom')
     }
     const map: Record<string, string> = {
       primary: this.colorPrimary, bg: this.colorBg, text: this.colorText,
