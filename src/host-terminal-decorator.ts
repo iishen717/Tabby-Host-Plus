@@ -237,12 +237,18 @@ export class HostTerminalDecorator extends TerminalDecorator {
         toolbar.appendChild(btn)
       }
     } else {
-      // 无工具栏时检查 QuickCmd+ 按钮是否已存在，避免重叠
-      const qcBtn = hostEl.querySelector('[data-qc-entry="1"]')
-      btn.style.position = 'absolute'
-      btn.style.top = qcBtn ? '36px' : '8px'
-      btn.style.right = '8px'
-      btn.style.zIndex = '99997'
+      hostEl.style.position = 'relative'
+
+      // 无工具栏时放入共享 flex 容器，两个插件自然并排
+      let container = hostEl.querySelector('[data-plugin-btns]') as HTMLElement | null
+      if (!container) {
+        container = document.createElement('div')
+        container.setAttribute('data-plugin-btns', '1')
+        container.style.cssText = 'position:absolute;top:8px;right:8px;z-index:99997;display:flex;gap:4px;'
+        hostEl.appendChild(container)
+      }
+
+      btn.style.position = 'static'
       btn.style.border = '0.5px solid var(--hp-primary, #b4befe)'
       btn.style.borderRadius = '6px'
       btn.style.padding = '3px 8px'
@@ -257,8 +263,7 @@ export class HostTerminalDecorator extends TerminalDecorator {
       btn.addEventListener('mouseenter', () => { btn.style.opacity = '1' })
       btn.addEventListener('mouseleave', () => { btn.style.opacity = '0.85' })
 
-      hostEl.style.position = 'relative'
-      hostEl.appendChild(btn)
+      container.appendChild(btn)
     }
 
     return btn
