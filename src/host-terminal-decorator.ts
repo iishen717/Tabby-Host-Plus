@@ -237,8 +237,10 @@ export class HostTerminalDecorator extends TerminalDecorator {
         toolbar.appendChild(btn)
       }
     } else {
+      // 无工具栏时检查 QuickCmd+ 按钮是否已存在，避免重叠
+      const qcBtn = hostEl.querySelector('[data-qc-entry="1"]')
       btn.style.position = 'absolute'
-      btn.style.top = '8px'
+      btn.style.top = qcBtn ? '36px' : '8px'
       btn.style.right = '8px'
       btn.style.zIndex = '99997'
       btn.style.border = '0.5px solid var(--hp-primary, #b4befe)'
