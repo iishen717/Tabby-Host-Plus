@@ -1,8 +1,4 @@
 const path = require('path')
-const fs = require('fs')
-
-// Tabby 用户插件目录
-const tabbyPluginDir = 'C:/Users/iishen717/AppData/Roaming/tabby/plugins/node_modules/tabby-host-plus/dist'
 
 module.exports = {
   target: 'node',
@@ -11,7 +7,7 @@ module.exports = {
   context: __dirname,
   mode: 'development',
   output: {
-    path: fs.existsSync(tabbyPluginDir) ? tabbyPluginDir : path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'dist'),
     filename: 'index.js',
     libraryTarget: 'commonjs2',
     devtoolModuleFilenameTemplate: 'webpack-tabby-host-plus:///[resource-path]',
@@ -44,20 +40,5 @@ module.exports = {
     /^rxjs/,
     /^@angular/,
     /^tabby-/,
-  ],
-  plugins: [
-    {
-      apply: (compiler) => {
-        compiler.hooks.afterEmit.tap('CopyPackageJson', () => {
-          const outDir = fs.existsSync(tabbyPluginDir) ? path.dirname(tabbyPluginDir) : path.resolve(__dirname, 'dist')
-          const src = path.resolve(__dirname, 'package.json')
-          const dest = path.join(outDir, 'package.json')
-          if (!fs.existsSync(dest)) {
-            fs.copyFileSync(src, dest)
-            console.log('[Host+] package.json copied to output dir')
-          }
-        })
-      }
-    }
   ],
 }

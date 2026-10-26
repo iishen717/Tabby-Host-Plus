@@ -12,15 +12,15 @@
     "prepublishOnly": "npm run build"
   },
   "files": ["dist"],
-  "author": "DD1024z",
+  "author": "iishen717",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/10D24D/Tabby-Host-Plus.git"
+    "url": "git+https://github.com/iishen717/Tabby-Host-Plus.git"
   },
-  "homepage": "https://github.com/10D24D/Tabby-Host-Plus#readme",
+  "homepage": "https://github.com/iishen717/Tabby-Host-Plus#readme",
   "bugs": {
-    "url": "https://github.com/10D24D/Tabby-Host-Plus/issues"
+    "url": "https://github.com/iishen717/Tabby-Host-Plus/issues"
   },
   "dependencies": {},
   "devDependencies": {
