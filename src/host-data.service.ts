@@ -2,6 +2,17 @@
  * Host+ 主机数据服务
  * 功能描述：主机 CRUD + 分组管理 + localStorage 持久化
  */
+export type PortForwardType = 'Local' | 'Remote' | 'Dynamic'
+
+export interface PortForwardRule {
+  type: PortForwardType
+  host: string
+  port: number
+  targetAddress: string
+  targetPort: number
+  description: string
+}
+
 export interface HostEntry {
   id: string
   name: string         // 名称
@@ -12,6 +23,7 @@ export interface HostEntry {
   password: string     // 密码（仅用于连接，不在主面板显示）
   authType?: 'password' | 'publicKey' // 认证方式：密码 / 私钥（旧数据缺省按密码处理）
   privateKeyPath?: string // 私钥文件路径（只保存路径，不保存私钥内容）
+  forwardedPorts?: PortForwardRule[] // 端口转发规则
   remark: string       // 备注
   group: string        // 分组名，空字符串表示未分组
   color?: string       // 显示颜色（可选）
@@ -229,6 +241,15 @@ export class HostDataService {
     if (g) g.expanded = !g.expanded
     else this.groups.push({ name, expanded: true, order: this.groups.length })
     this.saveGroups()
+  }
+
+  /** 关闭位置记忆时使用默认布局：所有分组折叠 */
+  collapseAllGroups(): void {
+    let changed = false
+    for (const g of this.groups) {
+      if (g.expanded) { g.expanded = false; changed = true }
+    }
+    if (changed) this.saveGroups()
   }
 
   addGroup(name: string, order?: number): void {

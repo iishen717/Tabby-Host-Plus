@@ -196,6 +196,18 @@ class HostDataService {
             this.groups.push({ name, expanded: true, order: this.groups.length });
         this.saveGroups();
     }
+    /** 关闭位置记忆时使用默认布局：所有分组折叠 */
+    collapseAllGroups() {
+        let changed = false;
+        for (const g of this.groups) {
+            if (g.expanded) {
+                g.expanded = false;
+                changed = true;
+            }
+        }
+        if (changed)
+            this.saveGroups();
+    }
     addGroup(name, order) {
         if (!name)
             return;
@@ -442,6 +454,12 @@ let HostFloatingPanel = class HostFloatingPanel {
         this.showEditModal = false;
         this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '' };
         this.showPassword = false;
+        this.showPortForwardModal = false;
+        this.pfHostId = '';
+        this.pfHostName = '';
+        this.pfType = 'Local';
+        this.pfAllRules = [];
+        this.pfNewRule = { type: 'Local', host: '127.0.0.1', port: 8000, targetAddress: '127.0.0.1', targetPort: 80, description: '' };
         this.showGroupRename = false;
         this.groupRenameIsNew = false;
         this.groupRenameOldName = '';
@@ -454,7 +472,7 @@ let HostFloatingPanel = class HostFloatingPanel {
         return this.groups;
     }
     get displayGroups() {
-        return this.groups.filter(g => {
+        const groups = this.groups.filter(g => {
             if (this.filterGroup === '__ungrouped__') {
                 if (g.name !== '')
                     return false;
@@ -469,6 +487,11 @@ let HostFloatingPanel = class HostFloatingPanel {
             }
             return true;
         });
+        // 搜索时临时展开有命中的分组，不改动持久化的展开状态
+        if (this.searchText && this.searchText.trim()) {
+            return groups.map(g => ({ ...g, expanded: true }));
+        }
+        return groups;
     }
     get selectedCount() {
         return this.filteredHosts.length;
@@ -481,9 +504,20 @@ let HostFloatingPanel = class HostFloatingPanel {
     }
     applyPositionMemory() {
         this.initTerminalInfo();
-        this.posMemoryOn = this.profileId ? this.svc.hasPositionMemory(this.profileId) : false;
-        this.restorePosition();
+        if (!this.profileId)
+            this.profileId = 'default';
+        this.posMemoryOn = this.svc.hasPositionMemory(this.profileId);
         this.loadData();
+        if (this.posMemoryOn) {
+            this.restorePosition();
+        }
+        else {
+            // 关闭位置记忆：使用默认布局，不恢复位置/分组/筛选/滚动
+            this.svc.collapseAllGroups();
+            this.groups = this.svc.getGroups();
+            this.filterGroup = '';
+        }
+        this.onSearch();
     }
     initTerminalInfo() {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
@@ -622,16 +656,30 @@ let HostFloatingPanel = class HostFloatingPanel {
             return;
         }
         const password = authType === 'publicKey' ? '' : (host.password || '');
+        const forwardedPorts = host.forwardedPorts || [];
         // 方式 1：Tabby 原生 SSH — 新建标签页（ProfilesService / AppService）
         if (this.openSSHTab) {
-            const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath);
+            const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath, forwardedPorts);
             if (ok)
                 return;
         }
         // 方式 2：CLI 兜底 — 仅当原生方式不可用时
-        const portOpt = port !== 22 ? ` -p ${port}` : '';
-        const keyOpt = privateKeyPath ? ` -i "${privateKeyPath}"` : '';
-        const sshCmd = `ssh${keyOpt} ${username}@${targetHost}${portOpt}`;
+        const parts = ['ssh'];
+        if (privateKeyPath)
+            parts.push('-i', `"${privateKeyPath}"`);
+        if (port !== 22)
+            parts.push('-p', String(port));
+        for (const fw of forwardedPorts) {
+            if (fw.type === 'Dynamic') {
+                parts.push('-D', `${fw.host}:${fw.port}`);
+            }
+            else {
+                const flag = fw.type === 'Remote' ? '-R' : '-L';
+                parts.push(flag, `${fw.host}:${fw.port}:${fw.targetAddress}:${fw.targetPort}`);
+            }
+        }
+        parts.push(`${username}@${targetHost}`);
+        const sshCmd = parts.join(' ');
         if (this.terminalRef) {
             this.sendToTerminal(sshCmd + '\n');
             return;
@@ -692,6 +740,9 @@ let HostFloatingPanel = class HostFloatingPanel {
         }
         catch ( /* ignore */_c) { /* ignore */ }
     }
+    get pfRules() {
+        return this.pfAllRules.filter(rule => rule.type === this.pfType);
+    }
     addHost() {
         this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: '', pinned: false };
         this.showEditModal = true;
@@ -724,6 +775,65 @@ let HostFloatingPanel = class HostFloatingPanel {
         catch (_a) {
             // 无法打开文件选择器时，允许用户手动输入路径
         }
+    }
+    openPortForward(host) {
+        this.pfHostId = host.id;
+        this.pfHostName = host.name || host.host;
+        this.pfAllRules = JSON.parse(JSON.stringify(host.forwardedPorts || []));
+        this.pfType = this.pfAllRules.length && this.pfAllRules[0].type ? this.pfAllRules[0].type : 'Local';
+        this.resetPfNewRule();
+        this.showPortForwardModal = true;
+    }
+    closePortForward() {
+        this.showPortForwardModal = false;
+        this.pfHostId = '';
+        this.pfHostName = '';
+        this.pfAllRules = [];
+    }
+    onPfTypeChange() {
+        this.resetPfNewRule();
+    }
+    resetPfNewRule() {
+        if (this.pfType === 'Dynamic') {
+            this.pfNewRule = { type: 'Dynamic', host: '127.0.0.1', port: 1080, targetAddress: '', targetPort: 0, description: '' };
+        }
+        else {
+            this.pfNewRule = { type: this.pfType, host: '127.0.0.1', port: 8000, targetAddress: '127.0.0.1', targetPort: 80, description: '' };
+        }
+    }
+    addPortForwardRule() {
+        const rule = this.pfNewRule;
+        const port = +rule.port;
+        if (!(rule.host || '').trim() || !port || port < 1 || port > 65535) {
+            alert(this.i18n.t('pf.invalid'));
+            return;
+        }
+        if (this.pfType !== 'Dynamic') {
+            const targetPort = +rule.targetPort;
+            if (!(rule.targetAddress || '').trim() || !targetPort || targetPort < 1 || targetPort > 65535) {
+                alert(this.i18n.t('pf.invalid'));
+                return;
+            }
+        }
+        this.pfAllRules.push({
+            type: this.pfType,
+            host: rule.host.trim(),
+            port,
+            targetAddress: this.pfType === 'Dynamic' ? '' : rule.targetAddress.trim(),
+            targetPort: this.pfType === 'Dynamic' ? 0 : +rule.targetPort,
+            description: (rule.description || '').trim(),
+        });
+        this.resetPfNewRule();
+    }
+    removePortForwardRule(rule) {
+        this.pfAllRules = this.pfAllRules.filter(item => item !== rule);
+    }
+    savePortForward() {
+        if (!this.pfHostId)
+            return;
+        this.svc.update(this.pfHostId, { forwardedPorts: this.pfAllRules });
+        this.closePortForward();
+        this.loadData();
     }
     copyHost(host) {
         var _a;
@@ -965,9 +1075,6 @@ let HostFloatingPanel = class HostFloatingPanel {
             if (this.posMemoryOn && this.profileId) {
                 this.svc.savePositionMemory(this.profileId, { panelX: this.panelX, panelY: this.panelY });
             }
-            else {
-                this.svc.savePanelPosition({ x: this.panelX, y: this.panelY });
-            }
             this.cleanDrag();
         };
         document.addEventListener('mousemove', this.dragMoveHandler);
@@ -1073,11 +1180,7 @@ let HostFloatingPanel = class HostFloatingPanel {
                 return;
             }
         }
-        const saved = this.svc.getPanelPosition();
-        if (saved.x !== 20 || saved.y !== 60) {
-            this.panelX = Math.max(0, saved.x);
-            this.panelY = Math.max(0, saved.y);
-        }
+        // 没有开启记忆：保留入口/居中定位的默认位置，只做边界修正
         setTimeout(() => {
             var _a, _b;
             const hostEl = (_b = (_a = this.terminalRef) === null || _a === void 0 ? void 0 : _a.element) === null || _b === void 0 ? void 0 : _b.nativeElement;
@@ -1115,7 +1218,7 @@ let HostFloatingPanel = class HostFloatingPanel {
     togglePosMemory() {
         var _a, _b;
         if (!this.profileId)
-            return;
+            this.profileId = 'default';
         this.posMemoryOn = this.svc.togglePositionMemory(this.profileId);
         if (this.posMemoryOn) {
             const groupExp = {};
@@ -1171,9 +1274,11 @@ HostFloatingPanel = __decorate([
         <span class="hp-title-btn hp-title-btn-mem"
               [title]="posMemoryOn ? i18n.t('panel.memory_on') : i18n.t('panel.memory_off')"
               [class.active]="posMemoryOn"
+              (mousedown)="$event.stopPropagation()"
               (click)="togglePosMemory(); $event.stopPropagation()">&#x2605;</span>
         <span class="hp-title-btn hp-title-btn-close"
               [title]="i18n.t('panel.close')"
+              (mousedown)="$event.stopPropagation()"
               (click)="doClose(); $event.stopPropagation()">&#x2715;</span>
       </div>
 
@@ -1255,6 +1360,7 @@ HostFloatingPanel = __decorate([
                   <span class="hp-host-act hp-host-act-copy" *ngIf="host.password && host.authType !== 'publicKey'" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x25A3;</span>
                   <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x23CE;</span>
                   <span class="hp-host-act" (click)="editHost(host); $event.stopPropagation()" [title]="i18n.t('panel.edit')">&#x270E;</span>
+                  <span class="hp-host-act hp-host-act-forward" (click)="openPortForward(host); $event.stopPropagation()" [title]="i18n.t('panel.port_forward')">&#x21C4;</span>
                   <span class="hp-host-act hp-host-act-del" (click)="deleteHost(host); $event.stopPropagation()" [title]="i18n.t('panel.delete')">&#x2715;</span>
                 </div>
               </div>
@@ -1426,6 +1532,82 @@ HostFloatingPanel = __decorate([
         <button class="hp-btn hp-btn-primary" (click)="confirmGroupRename()">{{ i18n.t('settings.ok') }}</button>
       </div>
     </div>
+
+    <!-- ====== 端口转发弹窗 ====== -->
+    <div class="hp-overlay" *ngIf="showPortForwardModal" (click)="closePortForward()"></div>
+    <div class="hp-modal" *ngIf="showPortForwardModal" (click)="$event.stopPropagation()">
+      <div class="hp-modal-header">
+        <span class="hp-modal-title">{{ i18n.t('pf.title') }} — {{ pfHostName }}</span>
+      </div>
+      <div class="hp-modal-body">
+        <div class="hp-field">
+          <label class="hp-field-label">{{ i18n.t('pf.type') }}</label>
+          <div class="hp-auth-row">
+            <label class="hp-auth-option" [class.active]="pfType === 'Local'">
+              <input type="radio" name="hp-pf-type" value="Local" [(ngModel)]="pfType" (ngModelChange)="onPfTypeChange()">
+              <span>{{ i18n.t('pf.local') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="pfType === 'Remote'">
+              <input type="radio" name="hp-pf-type" value="Remote" [(ngModel)]="pfType" (ngModelChange)="onPfTypeChange()">
+              <span>{{ i18n.t('pf.remote') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="pfType === 'Dynamic'">
+              <input type="radio" name="hp-pf-type" value="Dynamic" [(ngModel)]="pfType" (ngModelChange)="onPfTypeChange()">
+              <span>{{ i18n.t('pf.dynamic') }}</span>
+            </label>
+          </div>
+          <p class="hp-field-hint" *ngIf="pfType === 'Local'">{{ i18n.t('pf.local_hint') }}</p>
+          <p class="hp-field-hint" *ngIf="pfType === 'Remote'">{{ i18n.t('pf.remote_hint') }}</p>
+          <p class="hp-field-hint" *ngIf="pfType === 'Dynamic'">{{ i18n.t('pf.dynamic_hint') }}</p>
+        </div>
+
+        <div class="hp-pf-list" *ngIf="pfRules.length > 0">
+          <div class="hp-pf-rule" *ngFor="let fw of pfRules">
+            <div class="hp-pf-rule-main">
+              <span>{{ fw.host }}:{{ fw.port }}</span>
+              <span class="hp-pf-rule-arrow">&#x2192;</span>
+              <span *ngIf="fw.type !== 'Dynamic'">{{ fw.targetAddress }}:{{ fw.targetPort }}</span>
+              <span *ngIf="fw.type === 'Dynamic'">{{ i18n.t('pf.socks') }}</span>
+              <div class="hp-pf-rule-desc" *ngIf="fw.description">{{ fw.description }}</div>
+            </div>
+            <span class="hp-pf-rule-del" (click)="removePortForwardRule(fw)" [title]="i18n.t('panel.delete')">&#x2715;</span>
+          </div>
+        </div>
+        <p class="hp-field-hint" *ngIf="pfRules.length === 0">{{ i18n.t('pf.empty') }}</p>
+
+        <div class="hp-pf-add">
+          <label class="hp-field-label">{{ i18n.t('pf.add') }}</label>
+          <div class="hp-field-row">
+            <div class="hp-field hp-field-half">
+              <label class="hp-field-label">{{ i18n.t('pf.listen_host') }}</label>
+              <input class="hp-field-input" type="text" [(ngModel)]="pfNewRule.host" placeholder="127.0.0.1">
+            </div>
+            <div class="hp-field hp-field-half">
+              <label class="hp-field-label">{{ i18n.t('pf.listen_port') }}</label>
+              <input class="hp-field-input" type="number" min="1" max="65535" [(ngModel)]="pfNewRule.port" placeholder="8000">
+            </div>
+          </div>
+          <div class="hp-field-row" *ngIf="pfType !== 'Dynamic'">
+            <div class="hp-field hp-field-half">
+              <label class="hp-field-label">{{ i18n.t('pf.target_host') }}</label>
+              <input class="hp-field-input" type="text" [(ngModel)]="pfNewRule.targetAddress" placeholder="127.0.0.1">
+            </div>
+            <div class="hp-field hp-field-half">
+              <label class="hp-field-label">{{ i18n.t('pf.target_port') }}</label>
+              <input class="hp-field-input" type="number" min="1" max="65535" [(ngModel)]="pfNewRule.targetPort" placeholder="80">
+            </div>
+          </div>
+          <div class="hp-field">
+            <input class="hp-field-input" type="text" [(ngModel)]="pfNewRule.description" [placeholder]="i18n.t('pf.description')">
+          </div>
+          <button class="hp-btn hp-btn-primary hp-pf-add-btn" (click)="addPortForwardRule()">+ {{ i18n.t('pf.add') }}</button>
+        </div>
+      </div>
+      <div class="hp-modal-footer">
+        <button class="hp-btn hp-btn-ghost" (click)="closePortForward()">{{ i18n.t('settings.cancel') }}</button>
+        <button class="hp-btn hp-btn-primary" (click)="savePortForward()">{{ i18n.t('settings.save') }}</button>
+      </div>
+    </div>
   `,
         styles: [`
     /* ========================================
@@ -1547,7 +1729,7 @@ HostFloatingPanel = __decorate([
     }
     .hp-title-btn:hover { background: var(--_hover); color: var(--_text); }
     .hp-title-btn-mem { font-size: 14px; }
-    .hp-title-btn-mem.active { color: #f9e2af; }
+    .hp-title-btn-mem.active { color: #f9e2af; background: rgba(249,226,175,0.14); }
     .hp-title-btn-mem:hover { color: #f9e2af; }
     .hp-title-btn-close:hover { background: rgba(243,139,168,0.2); color: var(--_danger); }
 
@@ -1999,6 +2181,32 @@ HostFloatingPanel = __decorate([
     .hp-key-browse:hover { border-color: var(--_primary); color: var(--_text); }
     .hp-field-hint { margin: 6px 0 0; font-size: 0.78em; color: var(--_text-muted); line-height: 1.5; }
 
+    /* 端口转发 */
+    .hp-pf-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .hp-pf-rule {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+      padding: 8px 10px; border: 1px solid var(--_border); border-radius: 8px;
+      background: var(--_surface);
+    }
+    .hp-pf-rule-main {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      font-size: 0.86em; color: var(--_text); font-family: monospace;
+      overflow-wrap: anywhere;
+    }
+    .hp-pf-rule-arrow { color: var(--_primary); }
+    .hp-pf-rule-desc {
+      flex-basis: 100%; font-family: inherit;
+      font-size: 0.92em; color: var(--_text-muted);
+    }
+    .hp-pf-rule-del {
+      flex-shrink: 0; color: var(--_text-muted);
+      cursor: pointer; padding: 0 2px;
+    }
+    .hp-pf-rule-del:hover { color: var(--_danger); }
+    .hp-pf-add { border-top: 1px dashed var(--_border); padding-top: 12px; }
+    .hp-pf-add .hp-field { margin-bottom: 8px; }
+    .hp-pf-add-btn { width: 100%; justify-content: center; }
+
     /* 复选框行 */
     .hp-check-row { display: flex; gap: 18px; margin: 12px 0; }
     .hp-check {
@@ -2131,6 +2339,26 @@ const translations = {
         'panel.copy_password': '复制密码',
         'panel.drag_reorder': '拖拽排序',
         'panel.drag_reorder_group': '拖拽排序分组',
+        'panel.memory_on': '位置记忆已启用',
+        'panel.memory_off': '启用位置记忆',
+        'panel.port_forward': '端口转发',
+        'pf.title': '端口转发',
+        'pf.type': '转发类型',
+        'pf.local': '本地转发',
+        'pf.remote': '远程转发',
+        'pf.dynamic': '动态转发',
+        'pf.local_hint': '本地监听端口 → 远端目标',
+        'pf.remote_hint': '远端监听端口 → 本地目标',
+        'pf.dynamic_hint': '本地监听端口作为 SOCKS 代理',
+        'pf.listen_host': '监听地址',
+        'pf.listen_port': '监听端口',
+        'pf.target_host': '目标地址',
+        'pf.target_port': '目标端口',
+        'pf.description': '描述（可选）',
+        'pf.add': '添加规则',
+        'pf.empty': '暂无转发规则',
+        'pf.invalid': '请填写完整的地址和有效端口（1-65535）',
+        'pf.socks': 'SOCKS 代理',
         'host.name': '名称',
         'host.host': '主机地址',
         'host.ip': 'IP 地址',
@@ -2221,6 +2449,26 @@ const translations = {
         'panel.copy_password': 'Copy password',
         'panel.drag_reorder': 'Drag to reorder',
         'panel.drag_reorder_group': 'Drag to reorder group',
+        'panel.memory_on': 'Position memory ON',
+        'panel.memory_off': 'Enable position memory',
+        'panel.port_forward': 'Port forwarding',
+        'pf.title': 'Port Forwarding',
+        'pf.type': 'Forwarding type',
+        'pf.local': 'Local',
+        'pf.remote': 'Remote',
+        'pf.dynamic': 'Dynamic',
+        'pf.local_hint': 'Local listening port → remote target',
+        'pf.remote_hint': 'Remote listening port → local target',
+        'pf.dynamic_hint': 'Local listening port acts as a SOCKS proxy',
+        'pf.listen_host': 'Listen address',
+        'pf.listen_port': 'Listen port',
+        'pf.target_host': 'Target address',
+        'pf.target_port': 'Target port',
+        'pf.description': 'Description (optional)',
+        'pf.add': 'Add rule',
+        'pf.empty': 'No forwarding rules',
+        'pf.invalid': 'Please fill in valid addresses and ports (1-65535).',
+        'pf.socks': 'SOCKS proxy',
         'host.name': 'Name',
         'host.host': 'Host',
         'host.ip': 'IP',
@@ -3247,11 +3495,12 @@ var HostTerminalDecorator_1;
 
 
 /** 构造 SSH Profile：密码 / 私钥二选一 */
-function buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath) {
+function buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts) {
     const options = {
         host: sshHost,
         port,
         user,
+        forwardedPorts: forwardedPorts || [],
     };
     if (privateKeyPath) {
         options.auth = 'publicKey';
@@ -3645,8 +3894,8 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     });
                 };
                 // 注入 Tabby 原生 SSH 连接能力（通过 ProfilesService 打开 SSH 标签页）
-                const tryNativeSSH = (sshHost, port, user, password, privateKeyPath) => {
-                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath);
+                const tryNativeSSH = (sshHost, port, user, password, privateKeyPath, forwardedPorts) => {
+                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts);
                     // 路径 1：ProfilesService.openNewTabForProfile（Tabby 原生方式）
                     try {
                         const profilesService = this.injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
@@ -3660,7 +3909,7 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     // 路径 2：quickConnect（Tabby 快速连接 API，不支持私钥，私钥模式下跳过）
                     try {
                         const profilesService = this.injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
-                        if (!privateKeyPath && (profilesService === null || profilesService === void 0 ? void 0 : profilesService.quickConnect)) {
+                        if (!privateKeyPath && !(forwardedPorts && forwardedPorts.length) && (profilesService === null || profilesService === void 0 ? void 0 : profilesService.quickConnect)) {
                             const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`;
                             profilesService.quickConnect(query);
                             console.log('[Host+] Native SSH via quickConnect:', query);
@@ -3823,10 +4072,10 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                 cmp.panelX = Math.round((window.innerWidth - pw) / 2);
                 cmp.panelY = Math.round((window.innerHeight - 420) / 2);
                 cmp.terminalRef = null;
-                cmp.profileId = '';
+                cmp.profileId = 'standalone';
                 // SSH 连接回调
-                cmp.openSSHTab = (sshHost, port, user, password, privateKeyPath) => {
-                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath);
+                cmp.openSSHTab = (sshHost, port, user, password, privateKeyPath, forwardedPorts) => {
+                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts);
                     try {
                         const ps = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
                         if (ps === null || ps === void 0 ? void 0 : ps.openNewTabForProfile) {
@@ -3837,7 +4086,7 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     catch (_a) { }
                     try {
                         const ps = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
-                        if (!privateKeyPath && (ps === null || ps === void 0 ? void 0 : ps.quickConnect)) {
+                        if (!privateKeyPath && !(forwardedPorts && forwardedPorts.length) && (ps === null || ps === void 0 ? void 0 : ps.quickConnect)) {
                             const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`;
                             ps.quickConnect(query);
                             return true;
@@ -3850,6 +4099,8 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     HostTerminalDecorator_1.closeStandalonePanel();
                 };
                 appRef.attachView(cmpRef.hostView);
+                cmpRef.changeDetectorRef.detectChanges();
+                cmp.applyPositionMemory();
                 cmpRef.changeDetectorRef.detectChanges();
                 // 阻止面板内鼠标事件冒泡到遮罩
                 panelHost.addEventListener('mousedown', (ev) => ev.stopPropagation());
