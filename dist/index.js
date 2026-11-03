@@ -223,15 +223,11 @@ class HostDataService {
             this.saveGroups();
         }
     }
+    /** 删除分组及其下所有主机 */
     removeGroup(name) {
-        this.hosts.forEach(h => {
-            if (h.group === name)
-                h.group = '';
-        });
+        this.hosts = this.hosts.filter(h => (h.group || '') !== name);
+        this.groups = this.groups.filter(g => g.name !== name);
         this.saveHosts();
-        const idx = this.groups.findIndex(g => g.name === name);
-        if (idx !== -1)
-            this.groups.splice(idx, 1);
         this.saveGroups();
     }
     renameGroup(oldName, newName) {
@@ -411,6 +407,8 @@ let HostFloatingPanel = class HostFloatingPanel {
         this.i18n = new _host_i18n_service__WEBPACK_IMPORTED_MODULE_2__.HostI18nService();
         /** 由 TerminalDecorator 注入，用于调用 Tabby 原生 SSH 连接 */
         this.openSSHTab = null;
+        this.syncOfficialHostsProvider = null;
+        this.syncBusy = false;
         this.destroyed = false;
         this.minimized = false;
         this.panelX = 20;
@@ -516,8 +514,32 @@ let HostFloatingPanel = class HostFloatingPanel {
             this.svc.collapseAllGroups();
             this.groups = this.svc.getGroups();
             this.filterGroup = '';
+            this.centerPanel();
         }
         this.onSearch();
+    }
+    /** 位置记忆关闭时，面板默认居中显示 */
+    centerPanel() {
+        setTimeout(() => {
+            var _a, _b, _c;
+            try {
+                const panelEl = (_a = this.panelRef) === null || _a === void 0 ? void 0 : _a.nativeElement;
+                const width = (panelEl === null || panelEl === void 0 ? void 0 : panelEl.offsetWidth) || this.panelWidth || 380;
+                const height = (panelEl === null || panelEl === void 0 ? void 0 : panelEl.offsetHeight) || this.panelHeight || 420;
+                if (this.terminalRef) {
+                    const hostEl = (_c = (_b = this.terminalRef) === null || _b === void 0 ? void 0 : _b.element) === null || _c === void 0 ? void 0 : _c.nativeElement;
+                    if (!hostEl)
+                        return;
+                    this.panelX = Math.max(4, Math.round((hostEl.clientWidth - width) / 2));
+                    this.panelY = Math.max(4, Math.round((hostEl.clientHeight - height) / 2));
+                }
+                else {
+                    this.panelX = Math.max(4, Math.round((window.innerWidth - width) / 2));
+                    this.panelY = Math.max(4, Math.round((window.innerHeight - height) / 2));
+                }
+            }
+            catch ( /* ignore */_d) { /* ignore */ }
+        }, 0);
     }
     initTerminalInfo() {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
@@ -835,6 +857,78 @@ let HostFloatingPanel = class HostFloatingPanel {
         this.closePortForward();
         this.loadData();
     }
+    /** 将 Tabby 官方 SSH Profile 同步到本插件；密码不导入 */
+    async syncOfficialHosts() {
+        if (this.syncBusy || !this.syncOfficialHostsProvider)
+            return;
+        this.syncBusy = true;
+        try {
+            const official = await this.syncOfficialHostsProvider();
+            if (!official.length) {
+                alert(this.i18n.t('sync.empty'));
+                return;
+            }
+            // 先创建官方配置里存在的分组
+            const groupNames = new Set(this.svc.getGroups().map(g => g.name));
+            for (const host of official) {
+                if (host.groupName && !groupNames.has(host.groupName)) {
+                    this.svc.addGroup(host.groupName);
+                    groupNames.add(host.groupName);
+                }
+            }
+            const all = this.svc.getAll();
+            let added = 0;
+            let updated = 0;
+            for (const host of official) {
+                const match = all.find(item => item.officialProfileId === host.id)
+                    || all.find(item => (item.host || '').toLowerCase() === (host.host || '').toLowerCase()
+                        && (item.port || 22) === host.port
+                        && (item.username || '') === host.username);
+                const data = {
+                    name: host.name || host.host,
+                    host: host.host,
+                    ip: host.host,
+                    port: host.port,
+                    username: host.username,
+                    authType: host.authType,
+                    privateKeyPath: host.privateKeyPath,
+                    forwardedPorts: host.forwardedPorts,
+                    group: host.groupName || '',
+                    officialProfileId: host.id,
+                };
+                if (match) {
+                    // 已有主机保留原密码，只更新官方配置能提供的字段
+                    this.svc.update(match.id, data);
+                    updated++;
+                }
+                else {
+                    const entry = this.svc.add({ ...data, password: '', remark: '', pinned: false });
+                    all.push(entry);
+                    added++;
+                }
+            }
+            this.loadData();
+            window.dispatchEvent(new CustomEvent('hp-data-changed'));
+            alert(this.i18n.t('sync.done', { added, updated }));
+        }
+        catch (error) {
+            alert(this.i18n.t('sync.error', { error: String((error && error.message) || error) }));
+        }
+        finally {
+            this.syncBusy = false;
+        }
+    }
+    /** 认证信息缺失时的列表警告文案 */
+    authWarning(host) {
+        const authType = host.authType === 'publicKey' ? 'publicKey' : 'password';
+        if (authType === 'publicKey' && !(host.privateKeyPath || '').trim()) {
+            return this.i18n.t('host.private_key_missing_warning');
+        }
+        if (authType === 'password' && !(host.password || '').trim()) {
+            return this.i18n.t('host.password_missing_warning');
+        }
+        return '';
+    }
     copyHost(host) {
         var _a;
         const addr = host.port && host.port !== 22
@@ -870,10 +964,12 @@ let HostFloatingPanel = class HostFloatingPanel {
             alert(this.i18n.t('host.private_key_required'));
             return;
         }
-        if (authType === 'publicKey') {
+        if (authType === 'publicKey' && !privateKeyPath.startsWith('vault://')) {
             try {
                 const fs = window.require('fs');
-                if (!fs.existsSync(privateKeyPath)) {
+                // Tabby 官方私钥引用可能是 file://C:\...，校验时去掉 file:// 前缀
+                const checkPath = privateKeyPath.startsWith('file://') ? privateKeyPath.slice('file://'.length) : privateKeyPath;
+                if (!fs.existsSync(checkPath)) {
                     alert(this.i18n.t('host.private_key_missing', { path: privateKeyPath }));
                     return;
                 }
@@ -1012,7 +1108,9 @@ let HostFloatingPanel = class HostFloatingPanel {
         this.showGroupRename = true;
     }
     deleteGroup(name) {
-        if (name && !confirm(this.i18n.t('group.delete_confirm', { name })))
+        const displayName = name || this.i18n.t('app.ungrouped');
+        const count = this.svc.getAll().filter(h => (h.group || '') === name).length;
+        if (!confirm(this.i18n.t('group.delete_confirm', { name: displayName, count })))
             return;
         this.svc.removeGroup(name);
         this.loadData();
@@ -1247,12 +1345,16 @@ __decorate([
     (0,_angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewChild)('listRef'),
     __metadata("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef)
 ], HostFloatingPanel.prototype, "listRef", void 0);
+__decorate([
+    (0,_angular_core__WEBPACK_IMPORTED_MODULE_0__.ViewChild)('panelRef'),
+    __metadata("design:type", _angular_core__WEBPACK_IMPORTED_MODULE_0__.ElementRef)
+], HostFloatingPanel.prototype, "panelRef", void 0);
 HostFloatingPanel = __decorate([
     (0,_angular_core__WEBPACK_IMPORTED_MODULE_0__.Component)({
         selector: 'hp-floating-panel',
         template: `
     <!-- ====== 浮动面板主体 ====== -->
-    <div class="hp-panel"
+    <div class="hp-panel" #panelRef
       [class.minimized]="minimized"
       [class.resizing]="resizing !== null"
       [style.left.px]="panelX"
@@ -1271,6 +1373,11 @@ HostFloatingPanel = __decorate([
         <span class="hp-title">{{ i18n.t('app.title') }}</span>
         <span class="hp-ssh-badge" *ngIf="sshHost">{{ sshHost }}</span>
         <div class="hp-title-spacer"></div>
+        <span class="hp-title-btn hp-title-btn-sync"
+              [title]="i18n.t('panel.sync')"
+              [style.opacity]="syncBusy ? 0.5 : 1"
+              (mousedown)="$event.stopPropagation()"
+              (click)="syncOfficialHosts(); $event.stopPropagation()">&#x21BB;</span>
         <span class="hp-title-btn hp-title-btn-mem"
               [title]="posMemoryOn ? i18n.t('panel.memory_on') : i18n.t('panel.memory_off')"
               [class.active]="posMemoryOn"
@@ -1348,7 +1455,11 @@ HostFloatingPanel = __decorate([
                   (dragstart)="onDragStart($event, host)"
                   (dragend)="onDragEnd($event)" [title]="i18n.t('panel.drag_reorder')">&#x2261;</span>
                 <div class="hp-host-body">
-                  <span class="hp-host-name">{{ host.name }}</span>
+                  <div class="hp-host-name-row">
+                    <span class="hp-host-name">{{ host.name }}</span>
+                    <span class="hp-host-warning" *ngIf="authWarning(host)" [title]="authWarning(host)"
+                      (click)="$event.stopPropagation()">&#x26A0;&#xFE0E;</span>
+                  </div>
                   <div class="hp-host-details">
                     <span class="hp-host-detail hp-host-addr" *ngIf="host.host" [title]="i18n.t('host.host')">{{ host.host }}<span class="hp-host-port">:{{ host.port || 22 }}</span></span>
                     <span class="hp-host-detail hp-host-user" *ngIf="host.username" [title]="i18n.t('host.username')">{{ host.username }}</span>
@@ -1731,6 +1842,8 @@ HostFloatingPanel = __decorate([
     .hp-title-btn-mem { font-size: 14px; }
     .hp-title-btn-mem.active { color: #f9e2af; background: rgba(249,226,175,0.14); }
     .hp-title-btn-mem:hover { color: #f9e2af; }
+    .hp-title-btn-sync { font-size: 14px; }
+    .hp-title-btn-sync:hover { color: var(--_primary); }
     .hp-title-btn-close:hover { background: rgba(243,139,168,0.2); color: var(--_danger); }
 
     /* ========================================
@@ -1943,9 +2056,15 @@ HostFloatingPanel = __decorate([
     }
     .hp-host-drag:active { cursor: grabbing; }
     .hp-host-body { flex: 1; min-width: 0; }
+    .hp-host-name-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
     .hp-host-name {
       display: block; font-size: 0.9em; font-weight: 600;
       color: var(--_text); line-height: 1.4;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .hp-host-warning {
+      flex-shrink: 0; color: var(--_warning);
+      font-size: 0.9em; line-height: 1; cursor: default;
     }
     .hp-host-details {
       display: flex; gap: 8px; flex-wrap: wrap;
@@ -2342,6 +2461,10 @@ const translations = {
         'panel.memory_on': '位置记忆已启用',
         'panel.memory_off': '启用位置记忆',
         'panel.port_forward': '端口转发',
+        'panel.sync': '同步官方 SSH 配置',
+        'sync.done': '同步完成：新增 {added} 个，更新 {updated} 个',
+        'sync.empty': '未找到官方 SSH 主机',
+        'sync.error': '同步失败：{error}',
         'pf.title': '端口转发',
         'pf.type': '转发类型',
         'pf.local': '本地转发',
@@ -2373,6 +2496,8 @@ const translations = {
         'host.private_key_hint': '只保存路径，不复制私钥内容；加密私钥连接时会提示输入 passphrase。',
         'host.private_key_required': '请选择私钥文件',
         'host.private_key_missing': '私钥文件不存在：{path}',
+        'host.password_missing_warning': '密码认证未填写密码',
+        'host.private_key_missing_warning': '私钥认证未填写私钥路径',
         'host.browse': '浏览...',
         'host.remark': '备注',
         'host.group': '分组',
@@ -2407,12 +2532,12 @@ const translations = {
         'settings.data_management': '数据管理',
         'group.add': '新建分组',
         'group.name': '分组名称',
-        'group.delete': '删除分组（主机移至未分组）',
+        'group.delete': '删除分组（连同主机）',
         'group.rename': '重命名',
         'group.edit': '修改分组',
         'group.order': '排序',
         'group.manage': '管理分组',
-        'group.delete_confirm': '确定删除分组 "{name}" 吗？分组内的主机将移至未分组。',
+        'group.delete_confirm': '确定删除分组 "{name}" 吗？分组下的 {count} 台主机也会一起删除，且不可恢复。',
         'notify.connected': '已发起连接',
         'notify.copied': '地址已复制',
         'notify.import_ok': '导入成功',
@@ -2452,6 +2577,10 @@ const translations = {
         'panel.memory_on': 'Position memory ON',
         'panel.memory_off': 'Enable position memory',
         'panel.port_forward': 'Port forwarding',
+        'panel.sync': 'Sync official SSH hosts',
+        'sync.done': 'Sync complete: {added} added, {updated} updated',
+        'sync.empty': 'No official SSH hosts found',
+        'sync.error': 'Sync failed: {error}',
         'pf.title': 'Port Forwarding',
         'pf.type': 'Forwarding type',
         'pf.local': 'Local',
@@ -2483,6 +2612,8 @@ const translations = {
         'host.private_key_hint': 'Only the path is stored; encrypted keys prompt for a passphrase on connect.',
         'host.private_key_required': 'Please choose a private key file.',
         'host.private_key_missing': 'Private key file not found: {path}',
+        'host.password_missing_warning': 'Password authentication has no password set.',
+        'host.private_key_missing_warning': 'Private key authentication has no private key path set.',
         'host.browse': 'Browse...',
         'host.remark': 'Remark',
         'host.group': 'Group',
@@ -2518,11 +2649,11 @@ const translations = {
         'group.add': 'New Group',
         'group.name': 'Group Name',
         'group.order': 'Order',
-        'group.delete': 'Delete group (hosts become ungrouped)',
+        'group.delete': 'Delete group (with hosts)',
         'group.rename': 'Rename',
         'group.edit': 'Edit Group',
         'group.manage': 'Manage Groups',
-        'group.delete_confirm': 'Delete group "{name}"? Hosts inside will become ungrouped.',
+        'group.delete_confirm': 'Delete group "{name}"? Its {count} host(s) will also be deleted permanently.',
         'notify.connected': 'Connection initiated',
         'notify.copied': 'Address copied',
         'notify.import_ok': 'Import successful',
@@ -3516,6 +3647,57 @@ function buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, f
         options,
     };
 }
+/** 读取 Tabby 官方 SSH Profile，归一化为 Host+ 可写入的数据 */
+async function loadOfficialSSHHosts(injector) {
+    var _a, _b, _c;
+    const profilesService = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
+    const configService = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ConfigService);
+    const profiles = await profilesService.getProfiles();
+    const groups = (((_a = configService.store) === null || _a === void 0 ? void 0 : _a.groups) || ((_b = configService.store) === null || _b === void 0 ? void 0 : _b.profileGroups) || []);
+    const groupNames = new Map();
+    for (const group of groups) {
+        if (group && group.id)
+            groupNames.set(group.id, group.name || '');
+    }
+    const result = [];
+    for (const profile of profiles) {
+        if (!profile || profile.type !== 'ssh')
+            continue;
+        const options = profile.options || {};
+        const host = options.host || '';
+        if (!host)
+            continue;
+        const port = +(options.port || 22);
+        const username = options.user || '';
+        const privateKeys = Array.isArray(options.privateKeys) ? options.privateKeys : [];
+        const authType = options.auth === 'publicKey' && privateKeys.length > 0 ? 'publicKey' : 'password';
+        const groupId = profile.group || '';
+        const groupName = groupId
+            ? (groupNames.get(groupId) || (((_c = groups.find(g => g.name === groupId)) === null || _c === void 0 ? void 0 : _c.name) || ''))
+            : '';
+        const forwardedPorts = (Array.isArray(options.forwardedPorts) ? options.forwardedPorts : [])
+            .map((fw) => ({
+            type: fw.type === 'Remote' ? 'Remote' : fw.type === 'Dynamic' ? 'Dynamic' : 'Local',
+            host: fw.host || '127.0.0.1',
+            port: +fw.port || 0,
+            targetAddress: fw.targetAddress || '',
+            targetPort: +fw.targetPort || 0,
+            description: fw.description || '',
+        }));
+        result.push({
+            id: profile.id || `${host}:${port}:${username}`,
+            name: profile.name || (username ? `${username}@${host}` : host),
+            host,
+            port,
+            username,
+            authType,
+            privateKeyPath: authType === 'publicKey' ? String(privateKeys[0] || '') : '',
+            forwardedPorts,
+            groupName,
+        });
+    }
+    return result;
+}
 let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorator extends tabby_terminal__WEBPACK_IMPORTED_MODULE_1__.TerminalDecorator {
     constructor(resolver, appRef, zone, injector) {
         super();
@@ -3960,6 +4142,7 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     return false;
                 };
                 cmp.openSSHTab = tryNativeSSH;
+                cmp.syncOfficialHostsProvider = () => loadOfficialSSHHosts(this.injector);
                 this.appRef.attachView(cmpRef.hostView);
                 cmpRef.changeDetectorRef.detectChanges();
                 cmp.applyPositionMemory();
@@ -4095,6 +4278,7 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     catch (_b) { }
                     return false;
                 };
+                cmp.syncOfficialHostsProvider = () => loadOfficialSSHHosts(injector);
                 cmp.onClose = () => {
                     HostTerminalDecorator_1.closeStandalonePanel();
                 };

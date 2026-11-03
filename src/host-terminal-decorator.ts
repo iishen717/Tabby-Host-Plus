@@ -5,9 +5,9 @@
 import { Injectable, Injector, ComponentFactoryResolver, ApplicationRef, NgZone } from '@angular/core'
 import { TerminalDecorator } from 'tabby-terminal'
 import { HostFloatingPanel } from './host-floating-panel.component'
-import { HostDataService, PortForwardRule } from './host-data.service'
+import { HostDataService, PortForwardRule, OfficialSSHHost } from './host-data.service'
 import { HostI18nService } from './host-i18n.service'
-import { AppService, ProfilesService } from 'tabby-core'
+import { AppService, ProfilesService, ConfigService } from 'tabby-core'
 
 /** 构造 SSH Profile：密码 / 私钥二选一 */
 function buildSSHPartialProfile (
@@ -36,6 +36,58 @@ function buildSSHPartialProfile (
     name: sshHost,
     options,
   }
+}
+
+/** 读取 Tabby 官方 SSH Profile，归一化为 Host+ 可写入的数据 */
+async function loadOfficialSSHHosts (injector: Injector): Promise<OfficialSSHHost[]> {
+  const profilesService = injector.get(ProfilesService)
+  const configService = injector.get(ConfigService)
+  const profiles = await profilesService.getProfiles()
+  const groups = (configService.store?.groups || configService.store?.profileGroups || []) as any[]
+  const groupNames = new Map<string, string>()
+  for (const group of groups) {
+    if (group && group.id) groupNames.set(group.id, group.name || '')
+  }
+
+  const result: OfficialSSHHost[] = []
+  for (const profile of profiles) {
+    if (!profile || profile.type !== 'ssh') continue
+    const options = profile.options || {}
+    const host = options.host || ''
+    if (!host) continue
+
+    const port = +(options.port || 22)
+    const username = options.user || ''
+    const privateKeys = Array.isArray(options.privateKeys) ? options.privateKeys : []
+    const authType: 'password' | 'publicKey' =
+      options.auth === 'publicKey' && privateKeys.length > 0 ? 'publicKey' : 'password'
+    const groupId = profile.group || ''
+    const groupName = groupId
+      ? (groupNames.get(groupId) || (groups.find(g => g.name === groupId)?.name || ''))
+      : ''
+    const forwardedPorts: PortForwardRule[] = (Array.isArray(options.forwardedPorts) ? options.forwardedPorts : [])
+      .map((fw: any): PortForwardRule => ({
+        type: fw.type === 'Remote' ? 'Remote' : fw.type === 'Dynamic' ? 'Dynamic' : 'Local',
+        host: fw.host || '127.0.0.1',
+        port: +fw.port || 0,
+        targetAddress: fw.targetAddress || '',
+        targetPort: +fw.targetPort || 0,
+        description: fw.description || '',
+      }))
+
+    result.push({
+      id: profile.id || `${host}:${port}:${username}`,
+      name: profile.name || (username ? `${username}@${host}` : host),
+      host,
+      port,
+      username,
+      authType,
+      privateKeyPath: authType === 'publicKey' ? String(privateKeys[0] || '') : '',
+      forwardedPorts,
+      groupName,
+    })
+  }
+  return result
 }
 
 @Injectable()
@@ -501,6 +553,7 @@ export class HostTerminalDecorator extends TerminalDecorator {
           return false
         }
         cmp.openSSHTab = tryNativeSSH
+        cmp.syncOfficialHostsProvider = () => loadOfficialSSHHosts(this.injector)
 
         this.appRef.attachView(cmpRef.hostView)
         cmpRef.changeDetectorRef.detectChanges()
@@ -640,6 +693,8 @@ export class HostTerminalDecorator extends TerminalDecorator {
           } catch {}
           return false
         }
+
+        cmp.syncOfficialHostsProvider = () => loadOfficialSSHHosts(injector)
 
         cmp.onClose = () => {
           HostTerminalDecorator.closeStandalonePanel()

@@ -13,6 +13,19 @@ export interface PortForwardRule {
   description: string
 }
 
+/** 从 Tabby 官方 SSH Profile 归一化后的同步数据 */
+export interface OfficialSSHHost {
+  id: string
+  name: string
+  host: string
+  port: number
+  username: string
+  authType: 'password' | 'publicKey'
+  privateKeyPath: string
+  forwardedPorts: PortForwardRule[]
+  groupName: string
+}
+
 export interface HostEntry {
   id: string
   name: string         // 名称
@@ -24,6 +37,7 @@ export interface HostEntry {
   authType?: 'password' | 'publicKey' // 认证方式：密码 / 私钥（旧数据缺省按密码处理）
   privateKeyPath?: string // 私钥文件路径（只保存路径，不保存私钥内容）
   forwardedPorts?: PortForwardRule[] // 端口转发规则
+  officialProfileId?: string // 来自 Tabby 官方 SSH Profile 的 id，用于同步去重
   remark: string       // 备注
   group: string        // 分组名，空字符串表示未分组
   color?: string       // 显示颜色（可选）
@@ -265,13 +279,11 @@ export class HostDataService {
     if (g) { g.order = order; this.saveGroups() }
   }
 
+  /** 删除分组及其下所有主机 */
   removeGroup(name: string): void {
-    this.hosts.forEach(h => {
-      if (h.group === name) h.group = ''
-    })
+    this.hosts = this.hosts.filter(h => (h.group || '') !== name)
+    this.groups = this.groups.filter(g => g.name !== name)
     this.saveHosts()
-    const idx = this.groups.findIndex(g => g.name === name)
-    if (idx !== -1) this.groups.splice(idx, 1)
     this.saveGroups()
   }
 

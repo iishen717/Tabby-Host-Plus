@@ -29,6 +29,10 @@ declare module 'tabby-core' {
     quickConnect(query: string): Promise<any>
     launchProfile(profile: any): Promise<void>
   }
+  export class ConfigService {
+    store: any
+    get(): any
+  }
   export class NotificationsService {
     error(title: string, message: string): void
     notice(title: string, message?: string): void

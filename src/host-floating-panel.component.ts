@@ -3,14 +3,14 @@
  * 功能描述：浮动在终端上的主机管理面板，支持搜索/分组/SSH连接/最小化/拖拽
  */
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core'
-import { HostDataService, HostEntry, HostGroup, PositionMemoryData, PortForwardRule, PortForwardType } from './host-data.service'
+import { HostDataService, HostEntry, HostGroup, PositionMemoryData, PortForwardRule, PortForwardType, OfficialSSHHost } from './host-data.service'
 import { HostI18nService } from './host-i18n.service'
 
 @Component({
   selector: 'hp-floating-panel',
   template: `
     <!-- ====== 浮动面板主体 ====== -->
-    <div class="hp-panel"
+    <div class="hp-panel" #panelRef
       [class.minimized]="minimized"
       [class.resizing]="resizing !== null"
       [style.left.px]="panelX"
@@ -29,6 +29,11 @@ import { HostI18nService } from './host-i18n.service'
         <span class="hp-title">{{ i18n.t('app.title') }}</span>
         <span class="hp-ssh-badge" *ngIf="sshHost">{{ sshHost }}</span>
         <div class="hp-title-spacer"></div>
+        <span class="hp-title-btn hp-title-btn-sync"
+              [title]="i18n.t('panel.sync')"
+              [style.opacity]="syncBusy ? 0.5 : 1"
+              (mousedown)="$event.stopPropagation()"
+              (click)="syncOfficialHosts(); $event.stopPropagation()">&#x21BB;</span>
         <span class="hp-title-btn hp-title-btn-mem"
               [title]="posMemoryOn ? i18n.t('panel.memory_on') : i18n.t('panel.memory_off')"
               [class.active]="posMemoryOn"
@@ -106,7 +111,11 @@ import { HostI18nService } from './host-i18n.service'
                   (dragstart)="onDragStart($event, host)"
                   (dragend)="onDragEnd($event)" [title]="i18n.t('panel.drag_reorder')">&#x2261;</span>
                 <div class="hp-host-body">
-                  <span class="hp-host-name">{{ host.name }}</span>
+                  <div class="hp-host-name-row">
+                    <span class="hp-host-name">{{ host.name }}</span>
+                    <span class="hp-host-warning" *ngIf="authWarning(host)" [title]="authWarning(host)"
+                      (click)="$event.stopPropagation()">&#x26A0;&#xFE0E;</span>
+                  </div>
                   <div class="hp-host-details">
                     <span class="hp-host-detail hp-host-addr" *ngIf="host.host" [title]="i18n.t('host.host')">{{ host.host }}<span class="hp-host-port">:{{ host.port || 22 }}</span></span>
                     <span class="hp-host-detail hp-host-user" *ngIf="host.username" [title]="i18n.t('host.username')">{{ host.username }}</span>
@@ -489,6 +498,8 @@ import { HostI18nService } from './host-i18n.service'
     .hp-title-btn-mem { font-size: 14px; }
     .hp-title-btn-mem.active { color: #f9e2af; background: rgba(249,226,175,0.14); }
     .hp-title-btn-mem:hover { color: #f9e2af; }
+    .hp-title-btn-sync { font-size: 14px; }
+    .hp-title-btn-sync:hover { color: var(--_primary); }
     .hp-title-btn-close:hover { background: rgba(243,139,168,0.2); color: var(--_danger); }
 
     /* ========================================
@@ -701,9 +712,15 @@ import { HostI18nService } from './host-i18n.service'
     }
     .hp-host-drag:active { cursor: grabbing; }
     .hp-host-body { flex: 1; min-width: 0; }
+    .hp-host-name-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
     .hp-host-name {
       display: block; font-size: 0.9em; font-weight: 600;
       color: var(--_text); line-height: 1.4;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .hp-host-warning {
+      flex-shrink: 0; color: var(--_warning);
+      font-size: 0.9em; line-height: 1; cursor: default;
     }
     .hp-host-details {
       display: flex; gap: 8px; flex-wrap: wrap;
@@ -1050,12 +1067,15 @@ import { HostI18nService } from './host-i18n.service'
 })
 export class HostFloatingPanel implements OnInit, OnDestroy {
   @ViewChild('listRef') listRef!: ElementRef
+  @ViewChild('panelRef') panelRef!: ElementRef
 
   svc = new HostDataService()
   i18n = new HostI18nService()
 
   /** 由 TerminalDecorator 注入，用于调用 Tabby 原生 SSH 连接 */
   openSSHTab: ((host: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[]) => boolean) | null = null
+  syncOfficialHostsProvider: (() => Promise<OfficialSSHHost[]>) | null = null
+  syncBusy = false
 
   private destroyed = false
   minimized = false
@@ -1143,8 +1163,29 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
       this.svc.collapseAllGroups()
       this.groups = this.svc.getGroups()
       this.filterGroup = ''
+      this.centerPanel()
     }
     this.onSearch()
+  }
+
+  /** 位置记忆关闭时，面板默认居中显示 */
+  private centerPanel(): void {
+    setTimeout(() => {
+      try {
+        const panelEl = this.panelRef?.nativeElement as HTMLElement | null
+        const width = panelEl?.offsetWidth || this.panelWidth || 380
+        const height = panelEl?.offsetHeight || this.panelHeight || 420
+        if (this.terminalRef) {
+          const hostEl = this.terminalRef?.element?.nativeElement as HTMLElement | null
+          if (!hostEl) return
+          this.panelX = Math.max(4, Math.round((hostEl.clientWidth - width) / 2))
+          this.panelY = Math.max(4, Math.round((hostEl.clientHeight - height) / 2))
+        } else {
+          this.panelX = Math.max(4, Math.round((window.innerWidth - width) / 2))
+          this.panelY = Math.max(4, Math.round((window.innerHeight - height) / 2))
+        }
+      } catch { /* ignore */ }
+    }, 0)
   }
 
   private initTerminalInfo(): void {
@@ -1477,6 +1518,80 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     this.loadData()
   }
 
+  /** 将 Tabby 官方 SSH Profile 同步到本插件；密码不导入 */
+  async syncOfficialHosts(): Promise<void> {
+    if (this.syncBusy || !this.syncOfficialHostsProvider) return
+    this.syncBusy = true
+    try {
+      const official = await this.syncOfficialHostsProvider()
+      if (!official.length) {
+        alert(this.i18n.t('sync.empty'))
+        return
+      }
+
+      // 先创建官方配置里存在的分组
+      const groupNames = new Set(this.svc.getGroups().map(g => g.name))
+      for (const host of official) {
+        if (host.groupName && !groupNames.has(host.groupName)) {
+          this.svc.addGroup(host.groupName)
+          groupNames.add(host.groupName)
+        }
+      }
+
+      const all = this.svc.getAll()
+      let added = 0
+      let updated = 0
+      for (const host of official) {
+        const match = all.find(item => item.officialProfileId === host.id)
+          || all.find(item =>
+            (item.host || '').toLowerCase() === (host.host || '').toLowerCase()
+            && (item.port || 22) === host.port
+            && (item.username || '') === host.username
+          )
+        const data = {
+          name: host.name || host.host,
+          host: host.host,
+          ip: host.host,
+          port: host.port,
+          username: host.username,
+          authType: host.authType,
+          privateKeyPath: host.privateKeyPath,
+          forwardedPorts: host.forwardedPorts,
+          group: host.groupName || '',
+          officialProfileId: host.id,
+        }
+        if (match) {
+          // 已有主机保留原密码，只更新官方配置能提供的字段
+          this.svc.update(match.id, data)
+          updated++
+        } else {
+          const entry = this.svc.add({ ...data, password: '', remark: '', pinned: false })
+          all.push(entry)
+          added++
+        }
+      }
+      this.loadData()
+      window.dispatchEvent(new CustomEvent('hp-data-changed'))
+      alert(this.i18n.t('sync.done', { added, updated }))
+    } catch (error) {
+      alert(this.i18n.t('sync.error', { error: String((error && error.message) || error) }))
+    } finally {
+      this.syncBusy = false
+    }
+  }
+
+  /** 认证信息缺失时的列表警告文案 */
+  authWarning(host: HostEntry): string {
+    const authType = host.authType === 'publicKey' ? 'publicKey' : 'password'
+    if (authType === 'publicKey' && !(host.privateKeyPath || '').trim()) {
+      return this.i18n.t('host.private_key_missing_warning')
+    }
+    if (authType === 'password' && !(host.password || '').trim()) {
+      return this.i18n.t('host.password_missing_warning')
+    }
+    return ''
+  }
+
   copyHost(host: HostEntry): void {
     const addr = host.port && host.port !== 22
       ? `${host.host}:${host.port}`
@@ -1503,10 +1618,12 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
       alert(this.i18n.t('host.private_key_required'))
       return
     }
-    if (authType === 'publicKey') {
+    if (authType === 'publicKey' && !privateKeyPath.startsWith('vault://')) {
       try {
         const fs = (window as any).require('fs')
-        if (!fs.existsSync(privateKeyPath)) {
+        // Tabby 官方私钥引用可能是 file://C:\...，校验时去掉 file:// 前缀
+        const checkPath = privateKeyPath.startsWith('file://') ? privateKeyPath.slice('file://'.length) : privateKeyPath
+        if (!fs.existsSync(checkPath)) {
           alert(this.i18n.t('host.private_key_missing', { path: privateKeyPath }))
           return
         }
@@ -1637,7 +1754,9 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   }
 
   deleteGroup(name: string): void {
-    if (name && !confirm(this.i18n.t('group.delete_confirm', { name }))) return
+    const displayName = name || this.i18n.t('app.ungrouped')
+    const count = this.svc.getAll().filter(h => (h.group || '') === name).length
+    if (!confirm(this.i18n.t('group.delete_confirm', { name: displayName, count }))) return
     this.svc.removeGroup(name)
     this.loadData()
   }
