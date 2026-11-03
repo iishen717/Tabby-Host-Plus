@@ -440,7 +440,7 @@ let HostFloatingPanel = class HostFloatingPanel {
             this.loadData();
         };
         this.showEditModal = false;
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '' };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '' };
         this.showPassword = false;
         this.showGroupRename = false;
         this.groupRenameIsNew = false;
@@ -615,15 +615,23 @@ let HostFloatingPanel = class HostFloatingPanel {
         const username = host.username || 'root';
         if (!targetHost)
             return;
+        const authType = host.authType === 'publicKey' ? 'publicKey' : 'password';
+        const privateKeyPath = authType === 'publicKey' ? (host.privateKeyPath || '').trim() : '';
+        if (authType === 'publicKey' && !privateKeyPath) {
+            alert(this.i18n.t('host.private_key_required'));
+            return;
+        }
+        const password = authType === 'publicKey' ? '' : (host.password || '');
         // 方式 1：Tabby 原生 SSH — 新建标签页（ProfilesService / AppService）
         if (this.openSSHTab) {
-            const ok = this.openSSHTab(targetHost, port, username, host.password || '');
+            const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath);
             if (ok)
                 return;
         }
         // 方式 2：CLI 兜底 — 仅当原生方式不可用时
         const portOpt = port !== 22 ? ` -p ${port}` : '';
-        const sshCmd = `ssh ${username}@${targetHost}${portOpt}`;
+        const keyOpt = privateKeyPath ? ` -i "${privateKeyPath}"` : '';
+        const sshCmd = `ssh${keyOpt} ${username}@${targetHost}${portOpt}`;
         if (this.terminalRef) {
             this.sendToTerminal(sshCmd + '\n');
             return;
@@ -685,16 +693,37 @@ let HostFloatingPanel = class HostFloatingPanel {
         catch ( /* ignore */_c) { /* ignore */ }
     }
     addHost() {
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '', group: '', pinned: false };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: '', pinned: false };
         this.showEditModal = true;
     }
     addHostToGroup(groupName) {
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '', group: groupName || '', pinned: false };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: groupName || '', pinned: false };
         this.showEditModal = true;
     }
     editHost(host) {
         this.editHostEntry = JSON.parse(JSON.stringify(host));
+        if (!this.editHostEntry.authType) {
+            this.editHostEntry.authType = this.editHostEntry.privateKeyPath ? 'publicKey' : 'password';
+        }
+        if (!this.editHostEntry.privateKeyPath)
+            this.editHostEntry.privateKeyPath = '';
         this.showEditModal = true;
+    }
+    async browsePrivateKey(event) {
+        event.stopPropagation();
+        try {
+            const remote = window.require('@electron/remote');
+            const result = await remote.dialog.showOpenDialog({
+                title: this.i18n.t('host.private_key'),
+                properties: ['openFile'],
+            });
+            if (!result.canceled && result.filePaths && result.filePaths[0]) {
+                this.editHostEntry.privateKeyPath = result.filePaths[0];
+            }
+        }
+        catch (_a) {
+            // 无法打开文件选择器时，允许用户手动输入路径
+        }
     }
     copyHost(host) {
         var _a;
@@ -725,6 +754,22 @@ let HostFloatingPanel = class HostFloatingPanel {
             return;
         if (!this.editHostEntry.host && !this.editHostEntry.ip)
             return;
+        const authType = this.editHostEntry.authType === 'publicKey' ? 'publicKey' : 'password';
+        const privateKeyPath = (this.editHostEntry.privateKeyPath || '').trim();
+        if (authType === 'publicKey' && !privateKeyPath) {
+            alert(this.i18n.t('host.private_key_required'));
+            return;
+        }
+        if (authType === 'publicKey') {
+            try {
+                const fs = window.require('fs');
+                if (!fs.existsSync(privateKeyPath)) {
+                    alert(this.i18n.t('host.private_key_missing', { path: privateKeyPath }));
+                    return;
+                }
+            }
+            catch ( /* 无法检查时交给 Tabby 连接时报错 */_a) { /* 无法检查时交给 Tabby 连接时报错 */ }
+        }
         const updateData = {
             name: this.editHostEntry.name.trim(),
             host: (this.editHostEntry.host || '').trim(),
@@ -732,6 +777,8 @@ let HostFloatingPanel = class HostFloatingPanel {
             port: +(this.editHostEntry.port || 22),
             username: (this.editHostEntry.username || '').trim(),
             password: (this.editHostEntry.password || '').trim(),
+            authType,
+            privateKeyPath,
             remark: (this.editHostEntry.remark || '').trim(),
             group: this.editHostEntry.group || '',
             pinned: !!this.editHostEntry.pinned,
@@ -1205,7 +1252,7 @@ HostFloatingPanel = __decorate([
                 </div>
                 <div class="hp-host-actions">
                   <span class="hp-host-act hp-host-act-copy" (click)="copyHost(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_host')">&#x2750;</span>
-                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x25A3;</span>
+                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password && host.authType !== 'publicKey'" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x25A3;</span>
                   <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x23CE;</span>
                   <span class="hp-host-act" (click)="editHost(host); $event.stopPropagation()" [title]="i18n.t('panel.edit')">&#x270E;</span>
                   <span class="hp-host-act hp-host-act-del" (click)="deleteHost(host); $event.stopPropagation()" [title]="i18n.t('panel.delete')">&#x2715;</span>
@@ -1286,11 +1333,32 @@ HostFloatingPanel = __decorate([
           </div>
         </div>
         <div class="hp-field">
-          <label class="hp-field-label">{{ t('密码', 'Password') }}</label>
+          <label class="hp-field-label">{{ i18n.t('host.auth_type') }}</label>
+          <div class="hp-auth-row">
+            <label class="hp-auth-option" [class.active]="editHostEntry.authType !== 'publicKey'">
+              <input type="radio" name="hp-auth" value="password" [(ngModel)]="editHostEntry.authType">
+              <span>{{ i18n.t('host.auth_password') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="editHostEntry.authType === 'publicKey'">
+              <input type="radio" name="hp-auth" value="publicKey" [(ngModel)]="editHostEntry.authType">
+              <span>{{ i18n.t('host.auth_key') }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="hp-field" *ngIf="editHostEntry.authType !== 'publicKey'">
+          <label class="hp-field-label">{{ i18n.t('host.password') }}</label>
           <div class="hp-password-wrap">
-            <input class="hp-field-input hp-password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" placeholder="SSH 登录密码（不会在主面板显示）">
+            <input class="hp-field-input hp-password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" [placeholder]="i18n.t('host.password_hint')">
             <span class="hp-password-eye" [class.active]="showPassword" (click)="showPassword = !showPassword; $event.stopPropagation()" [title]="showPassword ? t('隐藏密码', 'Hide') : t('显示密码', 'Show')">&#x25C9;</span>
           </div>
+        </div>
+        <div class="hp-field" *ngIf="editHostEntry.authType === 'publicKey'">
+          <label class="hp-field-label">{{ i18n.t('host.private_key') }}</label>
+          <div class="hp-key-wrap">
+            <input class="hp-field-input hp-key-input" type="text" [(ngModel)]="editHostEntry.privateKeyPath" (keydown.enter)="saveEditHost()" placeholder="C:/Users/.../.ssh/id_rsa">
+            <span class="hp-key-browse" (click)="browsePrivateKey($event)">{{ i18n.t('host.browse') }}</span>
+          </div>
+          <p class="hp-field-hint">{{ i18n.t('host.private_key_hint') }}</p>
         </div>
         <div class="hp-field">
           <label class="hp-field-label">{{ i18n.t('host.remark') }}</label>
@@ -1902,6 +1970,35 @@ HostFloatingPanel = __decorate([
     .hp-password-eye.active { color: var(--_primary); }
     .hp-password-eye.active:hover { color: var(--_primary); opacity: 0.8; }
 
+    /* 认证方式选择 */
+    .hp-auth-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .hp-auth-option {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 6px;
+      border: 1px solid var(--_border);
+      cursor: pointer; font-size: 0.88em; color: var(--_text-secondary);
+      transition: all 0.15s; user-select: none;
+    }
+    .hp-auth-option:hover { border-color: var(--_primary); }
+    .hp-auth-option.active {
+      border-color: var(--_primary);
+      background: rgba(var(--_primary-rgb), 0.08);
+      color: var(--_text);
+    }
+    .hp-auth-option input { margin: 0; accent-color: var(--_primary); }
+
+    /* 私钥路径选择 */
+    .hp-key-wrap { display: flex; gap: 8px; align-items: center; }
+    .hp-key-input { flex: 1; min-width: 0; }
+    .hp-key-browse {
+      flex-shrink: 0; padding: 7px 12px; border-radius: 6px;
+      border: 1px solid var(--_border); background: var(--_surface);
+      font-size: 0.85em; cursor: pointer; color: var(--_text-secondary);
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .hp-key-browse:hover { border-color: var(--_primary); color: var(--_text); }
+    .hp-field-hint { margin: 6px 0 0; font-size: 0.78em; color: var(--_text-muted); line-height: 1.5; }
+
     /* 复选框行 */
     .hp-check-row { display: flex; gap: 18px; margin: 12px 0; }
     .hp-check {
@@ -2008,7 +2105,7 @@ __webpack_require__.r(__webpack_exports__);
 const translations = {
     'zh-CN': {
         'app.name': 'Host+',
-        'app.title': '主机管理',
+        'app.title': 'SSH 主机管理',
         'app.search': '搜索主机...',
         'app.ungrouped': '未分组',
         'app.noresults': '没有匹配的主机',
@@ -2041,6 +2138,14 @@ const translations = {
         'host.username': '用户名',
         'host.password': '密码',
         'host.password_hint': 'SSH 登录密码（不会在主面板显示）',
+        'host.auth_type': '认证方式',
+        'host.auth_password': '密码',
+        'host.auth_key': '私钥',
+        'host.private_key': '私钥文件',
+        'host.private_key_hint': '只保存路径，不复制私钥内容；加密私钥连接时会提示输入 passphrase。',
+        'host.private_key_required': '请选择私钥文件',
+        'host.private_key_missing': '私钥文件不存在：{path}',
+        'host.browse': '浏览...',
         'host.remark': '备注',
         'host.group': '分组',
         'host.pinned': '固定',
@@ -2090,7 +2195,7 @@ const translations = {
     },
     'en-US': {
         'app.name': 'Host+',
-        'app.title': 'Host Manager',
+        'app.title': 'SSH Host Manager',
         'app.search': 'Search hosts...',
         'app.ungrouped': 'Ungrouped',
         'app.noresults': 'No matching hosts',
@@ -2123,6 +2228,14 @@ const translations = {
         'host.username': 'User',
         'host.password': 'Password',
         'host.password_hint': 'SSH login password (hidden in main panel)',
+        'host.auth_type': 'Authentication',
+        'host.auth_password': 'Password',
+        'host.auth_key': 'Private Key',
+        'host.private_key': 'Private key file',
+        'host.private_key_hint': 'Only the path is stored; encrypted keys prompt for a passphrase on connect.',
+        'host.private_key_required': 'Please choose a private key file.',
+        'host.private_key_missing': 'Private key file not found: {path}',
+        'host.browse': 'Browse...',
         'host.remark': 'Remark',
         'host.group': 'Group',
         'host.pinned': 'Pinned',
@@ -3133,6 +3246,27 @@ var HostTerminalDecorator_1;
 
 
 
+/** 构造 SSH Profile：密码 / 私钥二选一 */
+function buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath) {
+    const options = {
+        host: sshHost,
+        port,
+        user,
+    };
+    if (privateKeyPath) {
+        options.auth = 'publicKey';
+        options.privateKeys = [privateKeyPath];
+    }
+    else {
+        options.auth = password ? 'password' : null;
+        options.password = password || undefined;
+    }
+    return {
+        type: 'ssh',
+        name: sshHost,
+        options,
+    };
+}
 let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorator extends tabby_terminal__WEBPACK_IMPORTED_MODULE_1__.TerminalDecorator {
     constructor(resolver, appRef, zone, injector) {
         super();
@@ -3511,18 +3645,8 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     });
                 };
                 // 注入 Tabby 原生 SSH 连接能力（通过 ProfilesService 打开 SSH 标签页）
-                const tryNativeSSH = (sshHost, port, user, password) => {
-                    const partialProfile = {
-                        type: 'ssh',
-                        name: sshHost,
-                        options: {
-                            host: sshHost,
-                            port: port,
-                            user: user,
-                            auth: password ? 'password' : null,
-                            password: password || undefined,
-                        },
-                    };
+                const tryNativeSSH = (sshHost, port, user, password, privateKeyPath) => {
+                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath);
                     // 路径 1：ProfilesService.openNewTabForProfile（Tabby 原生方式）
                     try {
                         const profilesService = this.injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
@@ -3533,10 +3657,10 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                         }
                     }
                     catch (e1) { /* continue */ }
-                    // 路径 2：quickConnect（Tabby 快速连接 API）
+                    // 路径 2：quickConnect（Tabby 快速连接 API，不支持私钥，私钥模式下跳过）
                     try {
                         const profilesService = this.injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
-                        if (profilesService === null || profilesService === void 0 ? void 0 : profilesService.quickConnect) {
+                        if (!privateKeyPath && (profilesService === null || profilesService === void 0 ? void 0 : profilesService.quickConnect)) {
                             const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`;
                             profilesService.quickConnect(query);
                             console.log('[Host+] Native SSH via quickConnect:', query);
@@ -3701,18 +3825,8 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                 cmp.terminalRef = null;
                 cmp.profileId = '';
                 // SSH 连接回调
-                cmp.openSSHTab = (sshHost, port, user, password) => {
-                    const partialProfile = {
-                        type: 'ssh',
-                        name: sshHost,
-                        options: {
-                            host: sshHost,
-                            port: port,
-                            user: user,
-                            auth: password ? 'password' : null,
-                            password: password || undefined,
-                        },
-                    };
+                cmp.openSSHTab = (sshHost, port, user, password, privateKeyPath) => {
+                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath);
                     try {
                         const ps = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
                         if (ps === null || ps === void 0 ? void 0 : ps.openNewTabForProfile) {
@@ -3723,7 +3837,7 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     catch (_a) { }
                     try {
                         const ps = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
-                        if (ps === null || ps === void 0 ? void 0 : ps.quickConnect) {
+                        if (!privateKeyPath && (ps === null || ps === void 0 ? void 0 : ps.quickConnect)) {
                             const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`;
                             ps.quickConnect(query);
                             return true;

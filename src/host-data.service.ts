@@ -10,6 +10,8 @@ export interface HostEntry {
   port: number         // 端口（默认 22）
   username: string     // 用户名
   password: string     // 密码（仅用于连接，不在主面板显示）
+  authType?: 'password' | 'publicKey' // 认证方式：密码 / 私钥（旧数据缺省按密码处理）
+  privateKeyPath?: string // 私钥文件路径（只保存路径，不保存私钥内容）
   remark: string       // 备注
   group: string        // 分组名，空字符串表示未分组
   color?: string       // 显示颜色（可选）

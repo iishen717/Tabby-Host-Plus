@@ -113,7 +113,7 @@ import { HostI18nService } from './host-i18n.service'
                 </div>
                 <div class="hp-host-actions">
                   <span class="hp-host-act hp-host-act-copy" (click)="copyHost(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_host')">&#x2750;</span>
-                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x25A3;</span>
+                  <span class="hp-host-act hp-host-act-copy" *ngIf="host.password && host.authType !== 'publicKey'" (click)="copyPassword(host); $event.stopPropagation()" [title]="i18n.t('panel.copy_password')">&#x25A3;</span>
                   <span class="hp-host-act hp-host-act-connect" (click)="connectToHost(host); $event.stopPropagation()" [title]="i18n.t('panel.ssh_connect')">&#x23CE;</span>
                   <span class="hp-host-act" (click)="editHost(host); $event.stopPropagation()" [title]="i18n.t('panel.edit')">&#x270E;</span>
                   <span class="hp-host-act hp-host-act-del" (click)="deleteHost(host); $event.stopPropagation()" [title]="i18n.t('panel.delete')">&#x2715;</span>
@@ -194,11 +194,32 @@ import { HostI18nService } from './host-i18n.service'
           </div>
         </div>
         <div class="hp-field">
-          <label class="hp-field-label">{{ t('密码', 'Password') }}</label>
+          <label class="hp-field-label">{{ i18n.t('host.auth_type') }}</label>
+          <div class="hp-auth-row">
+            <label class="hp-auth-option" [class.active]="editHostEntry.authType !== 'publicKey'">
+              <input type="radio" name="hp-auth" value="password" [(ngModel)]="editHostEntry.authType">
+              <span>{{ i18n.t('host.auth_password') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="editHostEntry.authType === 'publicKey'">
+              <input type="radio" name="hp-auth" value="publicKey" [(ngModel)]="editHostEntry.authType">
+              <span>{{ i18n.t('host.auth_key') }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="hp-field" *ngIf="editHostEntry.authType !== 'publicKey'">
+          <label class="hp-field-label">{{ i18n.t('host.password') }}</label>
           <div class="hp-password-wrap">
-            <input class="hp-field-input hp-password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" placeholder="SSH 登录密码（不会在主面板显示）">
+            <input class="hp-field-input hp-password-input" [type]="showPassword ? 'text' : 'password'" [(ngModel)]="editHostEntry.password" (keydown.enter)="saveEditHost()" [placeholder]="i18n.t('host.password_hint')">
             <span class="hp-password-eye" [class.active]="showPassword" (click)="showPassword = !showPassword; $event.stopPropagation()" [title]="showPassword ? t('隐藏密码', 'Hide') : t('显示密码', 'Show')">&#x25C9;</span>
           </div>
+        </div>
+        <div class="hp-field" *ngIf="editHostEntry.authType === 'publicKey'">
+          <label class="hp-field-label">{{ i18n.t('host.private_key') }}</label>
+          <div class="hp-key-wrap">
+            <input class="hp-field-input hp-key-input" type="text" [(ngModel)]="editHostEntry.privateKeyPath" (keydown.enter)="saveEditHost()" placeholder="C:/Users/.../.ssh/id_rsa">
+            <span class="hp-key-browse" (click)="browsePrivateKey($event)">{{ i18n.t('host.browse') }}</span>
+          </div>
+          <p class="hp-field-hint">{{ i18n.t('host.private_key_hint') }}</p>
         </div>
         <div class="hp-field">
           <label class="hp-field-label">{{ i18n.t('host.remark') }}</label>
@@ -810,6 +831,35 @@ import { HostI18nService } from './host-i18n.service'
     .hp-password-eye.active { color: var(--_primary); }
     .hp-password-eye.active:hover { color: var(--_primary); opacity: 0.8; }
 
+    /* 认证方式选择 */
+    .hp-auth-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .hp-auth-option {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 6px;
+      border: 1px solid var(--_border);
+      cursor: pointer; font-size: 0.88em; color: var(--_text-secondary);
+      transition: all 0.15s; user-select: none;
+    }
+    .hp-auth-option:hover { border-color: var(--_primary); }
+    .hp-auth-option.active {
+      border-color: var(--_primary);
+      background: rgba(var(--_primary-rgb), 0.08);
+      color: var(--_text);
+    }
+    .hp-auth-option input { margin: 0; accent-color: var(--_primary); }
+
+    /* 私钥路径选择 */
+    .hp-key-wrap { display: flex; gap: 8px; align-items: center; }
+    .hp-key-input { flex: 1; min-width: 0; }
+    .hp-key-browse {
+      flex-shrink: 0; padding: 7px 12px; border-radius: 6px;
+      border: 1px solid var(--_border); background: var(--_surface);
+      font-size: 0.85em; cursor: pointer; color: var(--_text-secondary);
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .hp-key-browse:hover { border-color: var(--_primary); color: var(--_text); }
+    .hp-field-hint { margin: 6px 0 0; font-size: 0.78em; color: var(--_text-muted); line-height: 1.5; }
+
     /* 复选框行 */
     .hp-check-row { display: flex; gap: 18px; margin: 12px 0; }
     .hp-check {
@@ -900,7 +950,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   i18n = new HostI18nService()
 
   /** 由 TerminalDecorator 注入，用于调用 Tabby 原生 SSH 连接 */
-  openSSHTab: ((host: string, port: number, user: string, password: string) => boolean) | null = null
+  openSSHTab: ((host: string, port: number, user: string, password: string, privateKeyPath: string) => boolean) | null = null
 
   private destroyed = false
   minimized = false
@@ -1114,15 +1164,24 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
 
     if (!targetHost) return
 
+    const authType = host.authType === 'publicKey' ? 'publicKey' : 'password'
+    const privateKeyPath = authType === 'publicKey' ? (host.privateKeyPath || '').trim() : ''
+    if (authType === 'publicKey' && !privateKeyPath) {
+      alert(this.i18n.t('host.private_key_required'))
+      return
+    }
+    const password = authType === 'publicKey' ? '' : (host.password || '')
+
     // 方式 1：Tabby 原生 SSH — 新建标签页（ProfilesService / AppService）
     if (this.openSSHTab) {
-      const ok = this.openSSHTab(targetHost, port, username, host.password || '')
+      const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath)
       if (ok) return
     }
 
     // 方式 2：CLI 兜底 — 仅当原生方式不可用时
     const portOpt = port !== 22 ? ` -p ${port}` : ''
-    const sshCmd = `ssh ${username}@${targetHost}${portOpt}`
+    const keyOpt = privateKeyPath ? ` -i "${privateKeyPath}"` : ''
+    const sshCmd = `ssh${keyOpt} ${username}@${targetHost}${portOpt}`
 
     if (this.terminalRef) {
       this.sendToTerminal(sshCmd + '\n')
@@ -1169,7 +1228,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   }
 
   showEditModal = false
-  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '' }
+  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '' }
   showPassword = false
 
   showGroupRename = false
@@ -1179,18 +1238,38 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   groupRenameOrder = 0
 
   addHost(): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '', group: '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: '', pinned: false }
     this.showEditModal = true
   }
 
   addHostToGroup(groupName: string): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', remark: '', group: groupName || '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: groupName || '', pinned: false }
     this.showEditModal = true
   }
 
   editHost(host: HostEntry): void {
     this.editHostEntry = JSON.parse(JSON.stringify(host))
+    if (!this.editHostEntry.authType) {
+      this.editHostEntry.authType = this.editHostEntry.privateKeyPath ? 'publicKey' : 'password'
+    }
+    if (!this.editHostEntry.privateKeyPath) this.editHostEntry.privateKeyPath = ''
     this.showEditModal = true
+  }
+
+  async browsePrivateKey(event: Event): Promise<void> {
+    event.stopPropagation()
+    try {
+      const remote = (window as any).require('@electron/remote')
+      const result = await remote.dialog.showOpenDialog({
+        title: this.i18n.t('host.private_key'),
+        properties: ['openFile'],
+      })
+      if (!result.canceled && result.filePaths && result.filePaths[0]) {
+        this.editHostEntry.privateKeyPath = result.filePaths[0]
+      }
+    } catch {
+      // 无法打开文件选择器时，允许用户手动输入路径
+    }
   }
 
   copyHost(host: HostEntry): void {
@@ -1213,6 +1292,21 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   saveEditHost(): void {
     if (!this.editHostEntry.name || !this.editHostEntry.name.trim()) return
     if (!this.editHostEntry.host && !this.editHostEntry.ip) return
+    const authType: 'password' | 'publicKey' = this.editHostEntry.authType === 'publicKey' ? 'publicKey' : 'password'
+    const privateKeyPath = (this.editHostEntry.privateKeyPath || '').trim()
+    if (authType === 'publicKey' && !privateKeyPath) {
+      alert(this.i18n.t('host.private_key_required'))
+      return
+    }
+    if (authType === 'publicKey') {
+      try {
+        const fs = (window as any).require('fs')
+        if (!fs.existsSync(privateKeyPath)) {
+          alert(this.i18n.t('host.private_key_missing', { path: privateKeyPath }))
+          return
+        }
+      } catch { /* 无法检查时交给 Tabby 连接时报错 */ }
+    }
     const updateData = {
       name: this.editHostEntry.name.trim(),
       host: (this.editHostEntry.host || '').trim(),
@@ -1220,6 +1314,8 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
       port: +(this.editHostEntry.port || 22),
       username: (this.editHostEntry.username || '').trim(),
       password: (this.editHostEntry.password || '').trim(),
+      authType,
+      privateKeyPath,
       remark: (this.editHostEntry.remark || '').trim(),
       group: this.editHostEntry.group || '',
       pinned: !!this.editHostEntry.pinned,

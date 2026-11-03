@@ -9,6 +9,33 @@ import { HostDataService } from './host-data.service'
 import { HostI18nService } from './host-i18n.service'
 import { AppService, ProfilesService } from 'tabby-core'
 
+/** 构造 SSH Profile：密码 / 私钥二选一 */
+function buildSSHPartialProfile (
+  sshHost: string,
+  port: number,
+  user: string,
+  password: string,
+  privateKeyPath: string,
+): any {
+  const options: any = {
+    host: sshHost,
+    port,
+    user,
+  }
+  if (privateKeyPath) {
+    options.auth = 'publicKey'
+    options.privateKeys = [privateKeyPath]
+  } else {
+    options.auth = password ? 'password' : null
+    options.password = password || undefined
+  }
+  return {
+    type: 'ssh',
+    name: sshHost,
+    options,
+  }
+}
+
 @Injectable()
 export class HostTerminalDecorator extends TerminalDecorator {
   /** 所有活跃终端入口的 rebuild 回调，供设置面板直接触发 */
@@ -407,18 +434,8 @@ export class HostTerminalDecorator extends TerminalDecorator {
         }
 
         // 注入 Tabby 原生 SSH 连接能力（通过 ProfilesService 打开 SSH 标签页）
-        const tryNativeSSH = (sshHost: string, port: number, user: string, password: string): boolean => {
-          const partialProfile = {
-            type: 'ssh',
-            name: sshHost,
-            options: {
-              host: sshHost,
-              port: port,
-              user: user,
-              auth: password ? 'password' : null,
-              password: password || undefined,
-            },
-          }
+        const tryNativeSSH = (sshHost: string, port: number, user: string, password: string, privateKeyPath: string): boolean => {
+          const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath)
 
           // 路径 1：ProfilesService.openNewTabForProfile（Tabby 原生方式）
           try {
@@ -430,10 +447,10 @@ export class HostTerminalDecorator extends TerminalDecorator {
             }
           } catch (e1) { /* continue */ }
 
-          // 路径 2：quickConnect（Tabby 快速连接 API）
+          // 路径 2：quickConnect（Tabby 快速连接 API，不支持私钥，私钥模式下跳过）
           try {
             const profilesService = this.injector.get(ProfilesService)
-            if (profilesService?.quickConnect) {
+            if (!privateKeyPath && profilesService?.quickConnect) {
               const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`
               profilesService.quickConnect(query)
               console.log('[Host+] Native SSH via quickConnect:', query)
@@ -602,18 +619,8 @@ export class HostTerminalDecorator extends TerminalDecorator {
         cmp.profileId = ''
 
         // SSH 连接回调
-        cmp.openSSHTab = (sshHost: string, port: number, user: string, password: string): boolean => {
-          const partialProfile = {
-            type: 'ssh',
-            name: sshHost,
-            options: {
-              host: sshHost,
-              port: port,
-              user: user,
-              auth: password ? 'password' : null,
-              password: password || undefined,
-            },
-          }
+        cmp.openSSHTab = (sshHost: string, port: number, user: string, password: string, privateKeyPath: string): boolean => {
+          const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath)
           try {
             const ps = injector.get(ProfilesService)
             if (ps?.openNewTabForProfile) {
@@ -623,7 +630,7 @@ export class HostTerminalDecorator extends TerminalDecorator {
           } catch {}
           try {
             const ps = injector.get(ProfilesService)
-            if (ps?.quickConnect) {
+            if (!privateKeyPath && ps?.quickConnect) {
               const query = port !== 22 ? `${user}@${sshHost}:${port}` : `${user}@${sshHost}`
               ps.quickConnect(query)
               return true
