@@ -457,7 +457,7 @@ let HostFloatingPanel = class HostFloatingPanel {
             this.loadData();
         };
         this.showEditModal = false;
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '' };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, remark: '' };
         this.showPassword = false;
         this.showPortForwardModal = false;
         this.pfHostId = '';
@@ -778,11 +778,11 @@ let HostFloatingPanel = class HostFloatingPanel {
         return this.pfAllRules.filter(rule => rule.type === this.pfType);
     }
     addHost() {
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: '', pinned: false };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, remark: '', group: '', pinned: false };
         this.showEditModal = true;
     }
     addHostToGroup(groupName) {
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: groupName || '', pinned: false };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, remark: '', group: groupName || '', pinned: false };
         this.showEditModal = true;
     }
     editHost(host) {
@@ -797,7 +797,6 @@ let HostFloatingPanel = class HostFloatingPanel {
             this.editHostEntry.privateKeyPath = '';
         this.editHostEntry.skipBanner = !!this.editHostEntry.skipBanner;
         this.editHostEntry.reuseSession = this.editHostEntry.reuseSession !== false;
-        this.editHostEntry.rememberCwd = !!this.editHostEntry.rememberCwd;
         this.showEditModal = true;
     }
     async browsePrivateKey(event) {
@@ -979,7 +978,6 @@ let HostFloatingPanel = class HostFloatingPanel {
         const ok = this.svc.update(this.editHostEntry.id, {
             skipBanner: !!this.editHostEntry.skipBanner,
             reuseSession: this.editHostEntry.reuseSession !== false,
-            rememberCwd: !!this.editHostEntry.rememberCwd,
         });
         if (ok)
             window.dispatchEvent(new CustomEvent('hp-data-changed'));
@@ -1018,7 +1016,6 @@ let HostFloatingPanel = class HostFloatingPanel {
             privateKeyPath,
             skipBanner: !!this.editHostEntry.skipBanner,
             reuseSession: this.editHostEntry.reuseSession !== false,
-            rememberCwd: !!this.editHostEntry.rememberCwd,
             remark: (this.editHostEntry.remark || '').trim(),
             group: this.editHostEntry.group || '',
             pinned: !!this.editHostEntry.pinned,
@@ -1623,11 +1620,6 @@ HostFloatingPanel = __decorate([
               [title]="i18n.t('host.reuse_session_hint')">
               <input type="checkbox" [(ngModel)]="editHostEntry.reuseSession" (ngModelChange)="onAdvancedToggle()">
               <span>{{ i18n.t('host.reuse_session') }}</span>
-            </label>
-            <label class="hp-auth-option" [class.active]="!!editHostEntry.rememberCwd"
-              [title]="i18n.t('host.remember_cwd_hint')">
-              <input type="checkbox" [(ngModel)]="editHostEntry.rememberCwd" (ngModelChange)="onAdvancedToggle()">
-              <span>{{ i18n.t('host.remember_cwd') }}</span>
             </label>
           </div>
         </div>
@@ -2564,8 +2556,6 @@ const translations = {
         'host.skip_motd_hint': '不显示 SSH 问候语',
         'host.reuse_session': '重用会话',
         'host.reuse_session_hint': '多个标签页复用同一个 SSH 连接',
-        'host.remember_cwd': '记忆目录',
-        'host.remember_cwd_hint': '记住上次的工作目录',
         'host.private_key': '私钥文件',
         'host.private_key_hint': '只保存路径，不复制私钥内容；加密私钥连接时会提示输入 passphrase。',
         'host.private_key_required': '请选择私钥文件',
@@ -2687,8 +2677,6 @@ const translations = {
         'host.skip_motd_hint': 'Do not show the SSH greeting',
         'host.reuse_session': 'Reuse session',
         'host.reuse_session_hint': 'Share one SSH connection across tabs',
-        'host.remember_cwd': 'Remember directory',
-        'host.remember_cwd_hint': 'Remember the last working directory',
         'host.private_key': 'Private key file',
         'host.private_key_hint': 'Only the path is stored; encrypted keys prompt for a passphrase on connect.',
         'host.private_key_required': 'Please choose a private key file.',

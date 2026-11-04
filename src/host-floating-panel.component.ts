@@ -246,11 +246,6 @@ import { HostI18nService } from './host-i18n.service'
               <input type="checkbox" [(ngModel)]="editHostEntry.reuseSession" (ngModelChange)="onAdvancedToggle()">
               <span>{{ i18n.t('host.reuse_session') }}</span>
             </label>
-            <label class="hp-auth-option" [class.active]="!!editHostEntry.rememberCwd"
-              [title]="i18n.t('host.remember_cwd_hint')">
-              <input type="checkbox" [(ngModel)]="editHostEntry.rememberCwd" (ngModelChange)="onAdvancedToggle()">
-              <span>{{ i18n.t('host.remember_cwd') }}</span>
-            </label>
           </div>
         </div>
         <div class="hp-field">
@@ -1437,7 +1432,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   }
 
   showEditModal = false
-  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '' }
+  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, remark: '' }
   showPassword = false
 
   showPortForwardModal = false
@@ -1458,12 +1453,12 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   groupRenameOrder = 0
 
   addHost(): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, remark: '', group: '', pinned: false }
     this.showEditModal = true
   }
 
   addHostToGroup(groupName: string): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: groupName || '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, remark: '', group: groupName || '', pinned: false }
     this.showEditModal = true
   }
 
@@ -1478,7 +1473,6 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     if (!this.editHostEntry.privateKeyPath) this.editHostEntry.privateKeyPath = ''
     this.editHostEntry.skipBanner = !!this.editHostEntry.skipBanner
     this.editHostEntry.reuseSession = this.editHostEntry.reuseSession !== false
-    this.editHostEntry.rememberCwd = !!this.editHostEntry.rememberCwd
     this.showEditModal = true
   }
 
@@ -1659,7 +1653,6 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     const ok = this.svc.update(this.editHostEntry.id, {
       skipBanner: !!this.editHostEntry.skipBanner,
       reuseSession: this.editHostEntry.reuseSession !== false,
-      rememberCwd: !!this.editHostEntry.rememberCwd,
     })
     if (ok) window.dispatchEvent(new CustomEvent('hp-data-changed'))
   }
@@ -1695,7 +1688,6 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
       privateKeyPath,
       skipBanner: !!this.editHostEntry.skipBanner,
       reuseSession: this.editHostEntry.reuseSession !== false,
-      rememberCwd: !!this.editHostEntry.rememberCwd,
       remark: (this.editHostEntry.remark || '').trim(),
       group: this.editHostEntry.group || '',
       pinned: !!this.editHostEntry.pinned,

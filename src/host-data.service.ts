@@ -39,7 +39,6 @@ export interface HostEntry {
   forwardedPorts?: PortForwardRule[] // 端口转发规则
   skipBanner?: boolean // 跳过 MOTD / SSH 问候语
   reuseSession?: boolean // 重用会话
-  rememberCwd?: boolean // 记忆目录（预留）
   officialProfileId?: string // 来自 Tabby 官方 SSH Profile 的 id，用于同步去重
   remark: string       // 备注
   group: string        // 分组名，空字符串表示未分组
