@@ -17,12 +17,16 @@ function buildSSHPartialProfile (
   password: string,
   privateKeyPath: string,
   forwardedPorts: PortForwardRule[],
+  skipBanner: boolean,
+  reuseSession: boolean,
 ): any {
   const options: any = {
     host: sshHost,
     port,
     user,
     forwardedPorts: forwardedPorts || [],
+    skipBanner: !!skipBanner,
+    reuseSession: !!reuseSession,
   }
   if (privateKeyPath) {
     options.auth = 'publicKey'
@@ -488,8 +492,8 @@ export class HostTerminalDecorator extends TerminalDecorator {
         }
 
         // 注入 Tabby 原生 SSH 连接能力（通过 ProfilesService 打开 SSH 标签页）
-        const tryNativeSSH = (sshHost: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[]): boolean => {
-          const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts)
+        const tryNativeSSH = (sshHost: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[], skipBanner: boolean, reuseSession: boolean): boolean => {
+          const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession)
 
           // 路径 1：ProfilesService.openNewTabForProfile（Tabby 原生方式）
           try {
@@ -674,8 +678,8 @@ export class HostTerminalDecorator extends TerminalDecorator {
         cmp.profileId = 'standalone'
 
         // SSH 连接回调
-        cmp.openSSHTab = (sshHost: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[]): boolean => {
-          const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts)
+        cmp.openSSHTab = (sshHost: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[], skipBanner: boolean, reuseSession: boolean): boolean => {
+          const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession)
           try {
             const ps = injector.get(ProfilesService)
             if (ps?.openNewTabForProfile) {

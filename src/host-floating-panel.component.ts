@@ -234,6 +234,26 @@ import { HostI18nService } from './host-i18n.service'
           <p class="hp-field-hint">{{ i18n.t('host.private_key_hint') }}</p>
         </div>
         <div class="hp-field">
+          <label class="hp-field-label">{{ i18n.t('host.advanced') }}</label>
+          <div class="hp-auth-row">
+            <label class="hp-auth-option" [class.active]="!!editHostEntry.skipBanner"
+              [title]="i18n.t('host.skip_motd_hint')">
+              <input type="checkbox" [(ngModel)]="editHostEntry.skipBanner" (ngModelChange)="onAdvancedToggle()">
+              <span>{{ i18n.t('host.skip_motd') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="!!editHostEntry.reuseSession"
+              [title]="i18n.t('host.reuse_session_hint')">
+              <input type="checkbox" [(ngModel)]="editHostEntry.reuseSession" (ngModelChange)="onAdvancedToggle()">
+              <span>{{ i18n.t('host.reuse_session') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="!!editHostEntry.rememberCwd"
+              [title]="i18n.t('host.remember_cwd_hint')">
+              <input type="checkbox" [(ngModel)]="editHostEntry.rememberCwd" (ngModelChange)="onAdvancedToggle()">
+              <span>{{ i18n.t('host.remember_cwd') }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="hp-field">
           <label class="hp-field-label">{{ i18n.t('host.remark') }}</label>
           <input class="hp-field-input" type="text" [(ngModel)]="editHostEntry.remark" (keydown.enter)="saveEditHost()" placeholder="e.g. 生产环境 Web 服务器">
         </div>
@@ -262,17 +282,26 @@ import { HostI18nService } from './host-i18n.service'
 
     <!-- 编辑弹窗 — 分组下拉 -->
     <div class="hp-filter-backdrop" *ngIf="showEditGroupDropdown" (click)="showEditGroupDropdown = false; $event.stopPropagation()" (mousedown)="$event.stopPropagation()"></div>
-    <div class="hp-filter-menu" *ngIf="showEditGroupDropdown" (mousedown)="$event.stopPropagation()"
+    <div class="hp-filter-menu hp-edit-group-menu" *ngIf="showEditGroupDropdown" (mousedown)="$event.stopPropagation()"
       [style.left.px]="editGroupMenuX" [style.top.px]="editGroupMenuY">
       <div class="hp-filter-option" [class.active]="!editHostEntry.group"
         (click)="editHostEntry.group = ''; showEditGroupDropdown = false">
-        <span class="hp-filter-opt-icon">&#x1F4C4;</span> {{ i18n.t('app.ungrouped') }}
+        <svg class="hp-filter-opt-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+          <polyline points="13 2 13 9 20 9"></polyline>
+        </svg>
+        {{ i18n.t('app.ungrouped') }}
       </div>
       <div class="hp-filter-opt-divider" *ngIf="allGroups.length > 0"></div>
       <div class="hp-filter-option" *ngFor="let g of allGroups"
         [class.active]="editHostEntry.group === g.name"
         (click)="editHostEntry.group = g.name; showEditGroupDropdown = false">
-        <span class="hp-filter-opt-icon">&#x1F4C1;</span> {{ g.name }}
+        <svg class="hp-filter-opt-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+        {{ g.name }}
       </div>
     </div>
 
@@ -552,6 +581,10 @@ import { HostI18nService } from './host-i18n.service'
     .hp-filter-option:hover { background: var(--_hover); color: var(--_text); }
     .hp-filter-option.active { background: rgba(var(--_primary-rgb), 0.12); color: var(--_primary); font-weight: 600; }
     .hp-filter-opt-icon { font-size: 0.85em; flex-shrink: 0; opacity: 0.6; }
+    .hp-filter-opt-svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.75; }
+    /* 编辑主机的分组下拉：去掉右侧滚动条，滑块不再破坏圆角 */
+    .hp-edit-group-menu { scrollbar-width: none; -ms-overflow-style: none; }
+    .hp-edit-group-menu::-webkit-scrollbar { display: none; width: 0; height: 0; }
     .hp-filter-opt-divider { height: 1px; margin: 4px 8px; background: var(--_border); }
     .hp-filter-clear-btn {
       width: 18px; height: 18px;
@@ -1073,7 +1106,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   i18n = new HostI18nService()
 
   /** 由 TerminalDecorator 注入，用于调用 Tabby 原生 SSH 连接 */
-  openSSHTab: ((host: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[]) => boolean) | null = null
+  openSSHTab: ((host: string, port: number, user: string, password: string, privateKeyPath: string, forwardedPorts: PortForwardRule[], skipBanner: boolean, reuseSession: boolean) => boolean) | null = null
   syncOfficialHostsProvider: (() => Promise<OfficialSSHHost[]>) | null = null
   syncBusy = false
 
@@ -1314,28 +1347,33 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   /** 连接到主机 — 优先 Tabby 原生 SSH 新建标签页，回退 CLI ssh */
   connectToHost(host: HostEntry): void {
     if (!host || this.destroyed) return
-    this.svc.incrementUsage(host.id)
-    this.highlightedId = host.id
+    // 多面板可能各自持有旧数据，连接前先以本地存储为准
+    this.loadData()
+    const current = this.hosts.find(h => h.id === host.id) || host
+    this.svc.incrementUsage(current.id)
+    this.highlightedId = current.id
     setTimeout(() => { this.highlightedId = '' }, 1500)
 
-    const targetHost = host.host || host.ip
-    const port = host.port || 22
-    const username = host.username || 'root'
+    const targetHost = current.host || current.ip
+    const port = current.port || 22
+    const username = current.username || 'root'
 
     if (!targetHost) return
 
-    const authType = host.authType === 'publicKey' ? 'publicKey' : 'password'
-    const privateKeyPath = authType === 'publicKey' ? (host.privateKeyPath || '').trim() : ''
+    const authType = current.authType === 'publicKey' ? 'publicKey' : 'password'
+    const privateKeyPath = authType === 'publicKey' ? (current.privateKeyPath || '').trim() : ''
     if (authType === 'publicKey' && !privateKeyPath) {
       alert(this.i18n.t('host.private_key_required'))
       return
     }
-    const password = authType === 'publicKey' ? '' : (host.password || '')
-    const forwardedPorts = host.forwardedPorts || []
+    const password = authType === 'publicKey' ? '' : (current.password || '')
+    const forwardedPorts = current.forwardedPorts || []
+    const skipBanner = !!current.skipBanner
+    const reuseSession = current.reuseSession !== false
 
     // 方式 1：Tabby 原生 SSH — 新建标签页（ProfilesService / AppService）
     if (this.openSSHTab) {
-      const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath, forwardedPorts)
+      const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession)
       if (ok) return
     }
 
@@ -1399,7 +1437,7 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   }
 
   showEditModal = false
-  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '' }
+  editHostEntry: any = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '' }
   showPassword = false
 
   showPortForwardModal = false
@@ -1420,21 +1458,27 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
   groupRenameOrder = 0
 
   addHost(): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: '', pinned: false }
     this.showEditModal = true
   }
 
   addHostToGroup(groupName: string): void {
-    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: groupName || '', pinned: false }
+    this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: groupName || '', pinned: false }
     this.showEditModal = true
   }
 
   editHost(host: HostEntry): void {
-    this.editHostEntry = JSON.parse(JSON.stringify(host))
+    // 多面板可能各自持有旧数据，编辑前先以本地存储为准
+    this.loadData()
+    const current = this.hosts.find(h => h.id === host.id) || host
+    this.editHostEntry = JSON.parse(JSON.stringify(current))
     if (!this.editHostEntry.authType) {
       this.editHostEntry.authType = this.editHostEntry.privateKeyPath ? 'publicKey' : 'password'
     }
     if (!this.editHostEntry.privateKeyPath) this.editHostEntry.privateKeyPath = ''
+    this.editHostEntry.skipBanner = !!this.editHostEntry.skipBanner
+    this.editHostEntry.reuseSession = this.editHostEntry.reuseSession !== false
+    this.editHostEntry.rememberCwd = !!this.editHostEntry.rememberCwd
     this.showEditModal = true
   }
 
@@ -1609,6 +1653,17 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
     this.editHostEntry.usageCount = 0
   }
 
+  /** 高级开关独立于表单保存：勾选即写入，避免关闭弹窗后丢失 */
+  onAdvancedToggle(): void {
+    if (!this.editHostEntry?.id) return
+    const ok = this.svc.update(this.editHostEntry.id, {
+      skipBanner: !!this.editHostEntry.skipBanner,
+      reuseSession: this.editHostEntry.reuseSession !== false,
+      rememberCwd: !!this.editHostEntry.rememberCwd,
+    })
+    if (ok) window.dispatchEvent(new CustomEvent('hp-data-changed'))
+  }
+
   saveEditHost(): void {
     if (!this.editHostEntry.name || !this.editHostEntry.name.trim()) return
     if (!this.editHostEntry.host && !this.editHostEntry.ip) return
@@ -1638,6 +1693,9 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
       password: (this.editHostEntry.password || '').trim(),
       authType,
       privateKeyPath,
+      skipBanner: !!this.editHostEntry.skipBanner,
+      reuseSession: this.editHostEntry.reuseSession !== false,
+      rememberCwd: !!this.editHostEntry.rememberCwd,
       remark: (this.editHostEntry.remark || '').trim(),
       group: this.editHostEntry.group || '',
       pinned: !!this.editHostEntry.pinned,

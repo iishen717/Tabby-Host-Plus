@@ -65,6 +65,7 @@ class HostDataService {
         return this.hosts.find(h => h.id === id);
     }
     add(entry) {
+        this.load();
         const now = Date.now();
         const newEntry = {
             ...entry,
@@ -78,6 +79,7 @@ class HostDataService {
         return newEntry;
     }
     update(id, partial) {
+        this.load();
         const idx = this.hosts.findIndex(h => h.id === id);
         if (idx === -1)
             return false;
@@ -86,6 +88,7 @@ class HostDataService {
         return true;
     }
     remove(id) {
+        this.load();
         const idx = this.hosts.findIndex(h => h.id === id);
         if (idx === -1)
             return false;
@@ -94,6 +97,7 @@ class HostDataService {
         return true;
     }
     incrementUsage(id) {
+        this.load();
         const host = this.hosts.find(h => h.id === id);
         if (host) {
             host.usageCount = (host.usageCount || 0) + 1;
@@ -101,6 +105,7 @@ class HostDataService {
         }
     }
     reorder(ids) {
+        this.load();
         const map = new Map(this.hosts.map(h => [h.id, h]));
         const reordered = [];
         const seen = new Set();
@@ -225,6 +230,7 @@ class HostDataService {
     }
     /** 删除分组及其下所有主机 */
     removeGroup(name) {
+        this.load();
         this.hosts = this.hosts.filter(h => (h.group || '') !== name);
         this.groups = this.groups.filter(g => g.name !== name);
         this.saveHosts();
@@ -233,6 +239,7 @@ class HostDataService {
     renameGroup(oldName, newName) {
         if (!newName || oldName === newName)
             return;
+        this.load();
         this.hosts.forEach(h => {
             if (h.group === oldName)
                 h.group = newName;
@@ -450,7 +457,7 @@ let HostFloatingPanel = class HostFloatingPanel {
             this.loadData();
         };
         this.showEditModal = false;
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '' };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '' };
         this.showPassword = false;
         this.showPortForwardModal = false;
         this.pfHostId = '';
@@ -663,25 +670,30 @@ let HostFloatingPanel = class HostFloatingPanel {
         var _a;
         if (!host || this.destroyed)
             return;
-        this.svc.incrementUsage(host.id);
-        this.highlightedId = host.id;
+        // 多面板可能各自持有旧数据，连接前先以本地存储为准
+        this.loadData();
+        const current = this.hosts.find(h => h.id === host.id) || host;
+        this.svc.incrementUsage(current.id);
+        this.highlightedId = current.id;
         setTimeout(() => { this.highlightedId = ''; }, 1500);
-        const targetHost = host.host || host.ip;
-        const port = host.port || 22;
-        const username = host.username || 'root';
+        const targetHost = current.host || current.ip;
+        const port = current.port || 22;
+        const username = current.username || 'root';
         if (!targetHost)
             return;
-        const authType = host.authType === 'publicKey' ? 'publicKey' : 'password';
-        const privateKeyPath = authType === 'publicKey' ? (host.privateKeyPath || '').trim() : '';
+        const authType = current.authType === 'publicKey' ? 'publicKey' : 'password';
+        const privateKeyPath = authType === 'publicKey' ? (current.privateKeyPath || '').trim() : '';
         if (authType === 'publicKey' && !privateKeyPath) {
             alert(this.i18n.t('host.private_key_required'));
             return;
         }
-        const password = authType === 'publicKey' ? '' : (host.password || '');
-        const forwardedPorts = host.forwardedPorts || [];
+        const password = authType === 'publicKey' ? '' : (current.password || '');
+        const forwardedPorts = current.forwardedPorts || [];
+        const skipBanner = !!current.skipBanner;
+        const reuseSession = current.reuseSession !== false;
         // 方式 1：Tabby 原生 SSH — 新建标签页（ProfilesService / AppService）
         if (this.openSSHTab) {
-            const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath, forwardedPorts);
+            const ok = this.openSSHTab(targetHost, port, username, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession);
             if (ok)
                 return;
         }
@@ -766,20 +778,26 @@ let HostFloatingPanel = class HostFloatingPanel {
         return this.pfAllRules.filter(rule => rule.type === this.pfType);
     }
     addHost() {
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: '', pinned: false };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: '', pinned: false };
         this.showEditModal = true;
     }
     addHostToGroup(groupName) {
-        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', remark: '', group: groupName || '', pinned: false };
+        this.editHostEntry = { name: '', host: '', ip: '', port: 22, username: '', password: '', authType: 'password', privateKeyPath: '', skipBanner: false, reuseSession: true, rememberCwd: false, remark: '', group: groupName || '', pinned: false };
         this.showEditModal = true;
     }
     editHost(host) {
-        this.editHostEntry = JSON.parse(JSON.stringify(host));
+        // 多面板可能各自持有旧数据，编辑前先以本地存储为准
+        this.loadData();
+        const current = this.hosts.find(h => h.id === host.id) || host;
+        this.editHostEntry = JSON.parse(JSON.stringify(current));
         if (!this.editHostEntry.authType) {
             this.editHostEntry.authType = this.editHostEntry.privateKeyPath ? 'publicKey' : 'password';
         }
         if (!this.editHostEntry.privateKeyPath)
             this.editHostEntry.privateKeyPath = '';
+        this.editHostEntry.skipBanner = !!this.editHostEntry.skipBanner;
+        this.editHostEntry.reuseSession = this.editHostEntry.reuseSession !== false;
+        this.editHostEntry.rememberCwd = !!this.editHostEntry.rememberCwd;
         this.showEditModal = true;
     }
     async browsePrivateKey(event) {
@@ -953,6 +971,19 @@ let HostFloatingPanel = class HostFloatingPanel {
         this.svc.update(this.editHostEntry.id, { usageCount: 0 });
         this.editHostEntry.usageCount = 0;
     }
+    /** 高级开关独立于表单保存：勾选即写入，避免关闭弹窗后丢失 */
+    onAdvancedToggle() {
+        var _a;
+        if (!((_a = this.editHostEntry) === null || _a === void 0 ? void 0 : _a.id))
+            return;
+        const ok = this.svc.update(this.editHostEntry.id, {
+            skipBanner: !!this.editHostEntry.skipBanner,
+            reuseSession: this.editHostEntry.reuseSession !== false,
+            rememberCwd: !!this.editHostEntry.rememberCwd,
+        });
+        if (ok)
+            window.dispatchEvent(new CustomEvent('hp-data-changed'));
+    }
     saveEditHost() {
         if (!this.editHostEntry.name || !this.editHostEntry.name.trim())
             return;
@@ -985,6 +1016,9 @@ let HostFloatingPanel = class HostFloatingPanel {
             password: (this.editHostEntry.password || '').trim(),
             authType,
             privateKeyPath,
+            skipBanner: !!this.editHostEntry.skipBanner,
+            reuseSession: this.editHostEntry.reuseSession !== false,
+            rememberCwd: !!this.editHostEntry.rememberCwd,
             remark: (this.editHostEntry.remark || '').trim(),
             group: this.editHostEntry.group || '',
             pinned: !!this.editHostEntry.pinned,
@@ -1578,6 +1612,26 @@ HostFloatingPanel = __decorate([
           <p class="hp-field-hint">{{ i18n.t('host.private_key_hint') }}</p>
         </div>
         <div class="hp-field">
+          <label class="hp-field-label">{{ i18n.t('host.advanced') }}</label>
+          <div class="hp-auth-row">
+            <label class="hp-auth-option" [class.active]="!!editHostEntry.skipBanner"
+              [title]="i18n.t('host.skip_motd_hint')">
+              <input type="checkbox" [(ngModel)]="editHostEntry.skipBanner" (ngModelChange)="onAdvancedToggle()">
+              <span>{{ i18n.t('host.skip_motd') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="!!editHostEntry.reuseSession"
+              [title]="i18n.t('host.reuse_session_hint')">
+              <input type="checkbox" [(ngModel)]="editHostEntry.reuseSession" (ngModelChange)="onAdvancedToggle()">
+              <span>{{ i18n.t('host.reuse_session') }}</span>
+            </label>
+            <label class="hp-auth-option" [class.active]="!!editHostEntry.rememberCwd"
+              [title]="i18n.t('host.remember_cwd_hint')">
+              <input type="checkbox" [(ngModel)]="editHostEntry.rememberCwd" (ngModelChange)="onAdvancedToggle()">
+              <span>{{ i18n.t('host.remember_cwd') }}</span>
+            </label>
+          </div>
+        </div>
+        <div class="hp-field">
           <label class="hp-field-label">{{ i18n.t('host.remark') }}</label>
           <input class="hp-field-input" type="text" [(ngModel)]="editHostEntry.remark" (keydown.enter)="saveEditHost()" placeholder="e.g. 生产环境 Web 服务器">
         </div>
@@ -1606,17 +1660,26 @@ HostFloatingPanel = __decorate([
 
     <!-- 编辑弹窗 — 分组下拉 -->
     <div class="hp-filter-backdrop" *ngIf="showEditGroupDropdown" (click)="showEditGroupDropdown = false; $event.stopPropagation()" (mousedown)="$event.stopPropagation()"></div>
-    <div class="hp-filter-menu" *ngIf="showEditGroupDropdown" (mousedown)="$event.stopPropagation()"
+    <div class="hp-filter-menu hp-edit-group-menu" *ngIf="showEditGroupDropdown" (mousedown)="$event.stopPropagation()"
       [style.left.px]="editGroupMenuX" [style.top.px]="editGroupMenuY">
       <div class="hp-filter-option" [class.active]="!editHostEntry.group"
         (click)="editHostEntry.group = ''; showEditGroupDropdown = false">
-        <span class="hp-filter-opt-icon">&#x1F4C4;</span> {{ i18n.t('app.ungrouped') }}
+        <svg class="hp-filter-opt-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+          <polyline points="13 2 13 9 20 9"></polyline>
+        </svg>
+        {{ i18n.t('app.ungrouped') }}
       </div>
       <div class="hp-filter-opt-divider" *ngIf="allGroups.length > 0"></div>
       <div class="hp-filter-option" *ngFor="let g of allGroups"
         [class.active]="editHostEntry.group === g.name"
         (click)="editHostEntry.group = g.name; showEditGroupDropdown = false">
-        <span class="hp-filter-opt-icon">&#x1F4C1;</span> {{ g.name }}
+        <svg class="hp-filter-opt-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+        {{ g.name }}
       </div>
     </div>
 
@@ -1896,6 +1959,10 @@ HostFloatingPanel = __decorate([
     .hp-filter-option:hover { background: var(--_hover); color: var(--_text); }
     .hp-filter-option.active { background: rgba(var(--_primary-rgb), 0.12); color: var(--_primary); font-weight: 600; }
     .hp-filter-opt-icon { font-size: 0.85em; flex-shrink: 0; opacity: 0.6; }
+    .hp-filter-opt-svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.75; }
+    /* 编辑主机的分组下拉：去掉右侧滚动条，滑块不再破坏圆角 */
+    .hp-edit-group-menu { scrollbar-width: none; -ms-overflow-style: none; }
+    .hp-edit-group-menu::-webkit-scrollbar { display: none; width: 0; height: 0; }
     .hp-filter-opt-divider { height: 1px; margin: 4px 8px; background: var(--_border); }
     .hp-filter-clear-btn {
       width: 18px; height: 18px;
@@ -2492,6 +2559,13 @@ const translations = {
         'host.auth_type': '认证方式',
         'host.auth_password': '密码',
         'host.auth_key': '私钥',
+        'host.advanced': '高级设置',
+        'host.skip_motd': '跳过 MOTD',
+        'host.skip_motd_hint': '不显示 SSH 问候语',
+        'host.reuse_session': '重用会话',
+        'host.reuse_session_hint': '多个标签页复用同一个 SSH 连接',
+        'host.remember_cwd': '记忆目录',
+        'host.remember_cwd_hint': '记住上次的工作目录',
         'host.private_key': '私钥文件',
         'host.private_key_hint': '只保存路径，不复制私钥内容；加密私钥连接时会提示输入 passphrase。',
         'host.private_key_required': '请选择私钥文件',
@@ -2608,6 +2682,13 @@ const translations = {
         'host.auth_type': 'Authentication',
         'host.auth_password': 'Password',
         'host.auth_key': 'Private Key',
+        'host.advanced': 'Advanced',
+        'host.skip_motd': 'Skip MOTD',
+        'host.skip_motd_hint': 'Do not show the SSH greeting',
+        'host.reuse_session': 'Reuse session',
+        'host.reuse_session_hint': 'Share one SSH connection across tabs',
+        'host.remember_cwd': 'Remember directory',
+        'host.remember_cwd_hint': 'Remember the last working directory',
         'host.private_key': 'Private key file',
         'host.private_key_hint': 'Only the path is stored; encrypted keys prompt for a passphrase on connect.',
         'host.private_key_required': 'Please choose a private key file.',
@@ -3626,12 +3707,14 @@ var HostTerminalDecorator_1;
 
 
 /** 构造 SSH Profile：密码 / 私钥二选一 */
-function buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts) {
+function buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession) {
     const options = {
         host: sshHost,
         port,
         user,
         forwardedPorts: forwardedPorts || [],
+        skipBanner: !!skipBanner,
+        reuseSession: !!reuseSession,
     };
     if (privateKeyPath) {
         options.auth = 'publicKey';
@@ -4076,8 +4159,8 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                     });
                 };
                 // 注入 Tabby 原生 SSH 连接能力（通过 ProfilesService 打开 SSH 标签页）
-                const tryNativeSSH = (sshHost, port, user, password, privateKeyPath, forwardedPorts) => {
-                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts);
+                const tryNativeSSH = (sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession) => {
+                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession);
                     // 路径 1：ProfilesService.openNewTabForProfile（Tabby 原生方式）
                     try {
                         const profilesService = this.injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
@@ -4257,8 +4340,8 @@ let HostTerminalDecorator = HostTerminalDecorator_1 = class HostTerminalDecorato
                 cmp.terminalRef = null;
                 cmp.profileId = 'standalone';
                 // SSH 连接回调
-                cmp.openSSHTab = (sshHost, port, user, password, privateKeyPath, forwardedPorts) => {
-                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts);
+                cmp.openSSHTab = (sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession) => {
+                    const partialProfile = buildSSHPartialProfile(sshHost, port, user, password, privateKeyPath, forwardedPorts, skipBanner, reuseSession);
                     try {
                         const ps = injector.get(tabby_core__WEBPACK_IMPORTED_MODULE_5__.ProfilesService);
                         if (ps === null || ps === void 0 ? void 0 : ps.openNewTabForProfile) {

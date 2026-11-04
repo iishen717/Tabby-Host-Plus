@@ -37,6 +37,9 @@ export interface HostEntry {
   authType?: 'password' | 'publicKey' // 认证方式：密码 / 私钥（旧数据缺省按密码处理）
   privateKeyPath?: string // 私钥文件路径（只保存路径，不保存私钥内容）
   forwardedPorts?: PortForwardRule[] // 端口转发规则
+  skipBanner?: boolean // 跳过 MOTD / SSH 问候语
+  reuseSession?: boolean // 重用会话
+  rememberCwd?: boolean // 记忆目录（预留）
   officialProfileId?: string // 来自 Tabby 官方 SSH Profile 的 id，用于同步去重
   remark: string       // 备注
   group: string        // 分组名，空字符串表示未分组
@@ -121,6 +124,7 @@ export class HostDataService {
   }
 
   add(entry: Omit<HostEntry, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): HostEntry {
+    this.load()
     const now = Date.now()
     const newEntry: HostEntry = {
       ...entry,
@@ -135,6 +139,7 @@ export class HostDataService {
   }
 
   update(id: string, partial: Partial<HostEntry>): boolean {
+    this.load()
     const idx = this.hosts.findIndex(h => h.id === id)
     if (idx === -1) return false
     this.hosts[idx] = { ...this.hosts[idx], ...partial, updatedAt: Date.now() }
@@ -143,6 +148,7 @@ export class HostDataService {
   }
 
   remove(id: string): boolean {
+    this.load()
     const idx = this.hosts.findIndex(h => h.id === id)
     if (idx === -1) return false
     this.hosts.splice(idx, 1)
@@ -151,6 +157,7 @@ export class HostDataService {
   }
 
   incrementUsage(id: string): void {
+    this.load()
     const host = this.hosts.find(h => h.id === id)
     if (host) {
       host.usageCount = (host.usageCount || 0) + 1
@@ -159,6 +166,7 @@ export class HostDataService {
   }
 
   reorder(ids: string[]): void {
+    this.load()
     const map = new Map(this.hosts.map(h => [h.id, h]))
     const reordered: HostEntry[] = []
     const seen = new Set<string>()
@@ -281,6 +289,7 @@ export class HostDataService {
 
   /** 删除分组及其下所有主机 */
   removeGroup(name: string): void {
+    this.load()
     this.hosts = this.hosts.filter(h => (h.group || '') !== name)
     this.groups = this.groups.filter(g => g.name !== name)
     this.saveHosts()
@@ -289,6 +298,7 @@ export class HostDataService {
 
   renameGroup(oldName: string, newName: string): void {
     if (!newName || oldName === newName) return
+    this.load()
     this.hosts.forEach(h => {
       if (h.group === oldName) h.group = newName
     })
