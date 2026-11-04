@@ -23,6 +23,8 @@ export interface OfficialSSHHost {
   authType: 'password' | 'publicKey'
   privateKeyPath: string
   forwardedPorts: PortForwardRule[]
+  skipBanner: boolean
+  reuseSession: boolean
   groupName: string
 }
 

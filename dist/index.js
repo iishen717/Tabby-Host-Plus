@@ -910,6 +910,8 @@ let HostFloatingPanel = class HostFloatingPanel {
                     authType: host.authType,
                     privateKeyPath: host.privateKeyPath,
                     forwardedPorts: host.forwardedPorts,
+                    skipBanner: host.skipBanner,
+                    reuseSession: host.reuseSession,
                     group: host.groupName || '',
                     officialProfileId: host.id,
                 };
@@ -3764,6 +3766,8 @@ async function loadOfficialSSHHosts(injector) {
             authType,
             privateKeyPath: authType === 'publicKey' ? String(privateKeys[0] || '') : '',
             forwardedPorts,
+            skipBanner: !!options.skipBanner,
+            reuseSession: options.reuseSession !== false,
             groupName,
         });
     }

@@ -88,6 +88,8 @@ async function loadOfficialSSHHosts (injector: Injector): Promise<OfficialSSHHos
       authType,
       privateKeyPath: authType === 'publicKey' ? String(privateKeys[0] || '') : '',
       forwardedPorts,
+      skipBanner: !!options.skipBanner,
+      reuseSession: options.reuseSession !== false,
       groupName,
     })
   }

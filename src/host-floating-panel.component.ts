@@ -1595,6 +1595,8 @@ export class HostFloatingPanel implements OnInit, OnDestroy {
           authType: host.authType,
           privateKeyPath: host.privateKeyPath,
           forwardedPorts: host.forwardedPorts,
+          skipBanner: host.skipBanner,
+          reuseSession: host.reuseSession,
           group: host.groupName || '',
           officialProfileId: host.id,
         }
